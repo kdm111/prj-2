@@ -1,0 +1,13 @@
+# Pick: 물건을 짚는 동작
+
+# ---- Goal ----
+string object_id                       # 짚어야 할 물건의 아이디
+---
+# ---- Result ----
+bool success                           # 성공 여부
+int32 error_code                       # 에러 발생 시 에러 코드
+string message                         # 동작 메시지
+---
+# ---- Feedback ----
+string stage                           # 단계별 동작
+float32 progress                       # 진행률

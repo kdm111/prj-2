@@ -1,0 +1,28 @@
+# `docker compose` reads this to *run* our containers (runtime).
+# Each Dockerfile (build/*.Dockerfile) describes how to *build* one image.
+name: dualarm
+
+services:
+  # ---- agent: LLM planning + recovery + sequential executor (ROS 2 action client) ----
+  agent:
+    build:
+      context: .                       # build can see the whole repo
+      dockerfile: docker/agent.Dockerfile
+    image: dualarm/agent:dev
+    container_name: dualarm-agent
+    init: true                         # real PID 1 (tini) so signals/Ctrl-C behave
+    volumes:
+      - ./:/ws                         # bind-mount repo -> host edits are live inside
+    working_dir: /ws
+    environment:
+      ROS_DOMAIN_ID: "48"              # same id on every service => they discover each other
+    networks:
+      - dualarm
+    # Stays alive via the Dockerfile CMD (sleep infinity); we `exec` in to work.
+
+# User-defined bridge network. ROS 2's default DDS discovery (multicast) works
+# between containers that share one of these networks — that's how agent/motion/
+# perception will find each other once we add them.
+networks:
+  dualarm:
+    driver: bridge
