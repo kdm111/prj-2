@@ -1,3 +1,12 @@
+<!-- 
+의존성 선언
+colcon : 빌드 순서를 정하는데 쓰인다. ament_cmake로 cmake를 부르거나 ament_python을 보고 setup.py를 부른다.
+rosdep : 의존성 설치 어떤 패키지가 필요한지 본 후에 그걸 적는다.
+
+여기에 적혀 있지 않다면 패키지가 적혀있지 않는다. 각 컨테이너 환경에서 패키지가 여기에 적혀 있지 않다면 
+설치가 안될 수 있다. 
+
+ -->
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
@@ -15,9 +24,11 @@
 
   <depend>geometry_msgs</depend>
   <depend>std_msgs</depend>
-
+  <depend>builtin_interfaces</depend>
+  <!-- 실행 시점 의존성 -->
   <exec_depend>rosidl_default_runtime</exec_depend>
 
+  <!-- 인터페이스 패키지 -->
   <member_of_group>rosidl_interface_packages</member_of_group>
 
   <export>
