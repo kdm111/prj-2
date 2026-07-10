@@ -1,7 +1,7 @@
-# Place: 물건을 놓는 동작
+# MoveTo: 사전 정의된 자세로 이동
 
 # ---- Goal ----
-string target_id                       # 놓아야 할 곳의 아이디
+string target_name                     # 움직여야 할 자세
 ---
 # ---- Result ----
 bool success                           # 성공 여부

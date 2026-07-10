@@ -2,6 +2,13 @@
 # 실제로 만들어 내느 경로
 # 패키지가 설치된 경로를 찾아 헤더, 라이브러리 위치를 변수에 담아라.
 
+
+
+# 1단계 : 정규화 : .msg, .action 파일을 변환한다.
+# 2단계 : 액션 해체 : 액션은 사실 토픽과 서비스를 조립해서 만든 것이다.
+# action의 msg를 보고 SendGaol, GetResult, FeedbackMessage, CancelGoal이 생성된다.
+# 그래서 액션을 띄우면 없던 토픽과 서비스가 보인다.
+# 3단계 : 코드 생성 :  rosidl_type
 cmake_minimum_required(VERSION 3.8)
 project(arm_interfaces)
 
@@ -24,7 +31,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   # 액션
   "action/Pick.action"
   "action/Place.action"
-  DEPENDENCIES geometry_msgs std_msgs
+  "action/MoveTo.action"
+  DEPENDENCIES geometry_msgs std_msgs builtin_interfaces
 )
 
 ament_export_dependencies(rosidl_default_runtime)

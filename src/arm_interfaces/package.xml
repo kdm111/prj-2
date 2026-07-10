@@ -1,3 +1,6 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<!-- 파서는 열자마자  인코딩을 알아야 한다. 선언은 파일의 가장 첫 바이트여야 한다. -->
 <!-- 
 의존성 선언
 colcon : 빌드 순서를 정하는데 쓰인다. ament_cmake로 cmake를 부르거나 ament_python을 보고 setup.py를 부른다.
@@ -6,14 +9,12 @@ rosdep : 의존성 설치 어떤 패키지가 필요한지 본 후에 그걸 적
 여기에 적혀 있지 않다면 패키지가 적혀있지 않는다. 각 컨테이너 환경에서 패키지가 여기에 적혀 있지 않다면 
 설치가 안될 수 있다. 
 
- -->
-<?xml version="1.0"?>
-<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+-->
 <package format="3">
   <name>arm_interfaces</name>
   <version>0.0.1</version>
   <description>
-    Shared action/msg contract for the dual-arm system.
+    Shared action/msg contract for the single-arm system.
     Depended on by the agent (client), motion (server), and perception nodes.
   </description>
   <maintainer email="pjsu94@gmail.com">kdm111</maintainer>

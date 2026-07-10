@@ -5,8 +5,7 @@ string object_id                       # 짚어야 할 물건의 아이디
 ---
 # ---- Result ----
 bool success                           # 성공 여부
-int32 error_code                       # 에러 발생 시 에러 코드
-string message                         # 동작 메시지
+FailureReport failure                  # 실패 상세. success=true failure.code == SUCCESS
 ---
 # ---- Feedback ----
 string stage                           # 단계별 동작
