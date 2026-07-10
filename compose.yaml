@@ -15,7 +15,7 @@ services:
       - ./:/ws                         # bind-mount repo -> host edits are live inside
     working_dir: /ws
     environment:
-      ROS_DOMAIN_ID: "48"              # same id on every service => they discover each other
+      ROS_DOMAIN_ID: "48"              
     networks:
       - singlearm
   sim:
