@@ -2,6 +2,7 @@
 
 # ---- Goal ----
 string object_id                       # 짚어야 할 물건의 아이디
+uint8  attempt                         # 시도 횟수
 ---
 # ---- Result ----
 bool success                           # 성공 여부

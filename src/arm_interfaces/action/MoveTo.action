@@ -2,6 +2,7 @@
 
 # ---- Goal ----
 string target_name                     # 움직여야 할 자세
+uint8  attempt                         # 시도 횟수
 ---
 # ---- Result ----
 bool success                           # 성공 여부

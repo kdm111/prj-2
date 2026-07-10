@@ -2,6 +2,7 @@
 
 # ---- Goal ----
 string target_id                       # 놓아야 할 곳의 아이디
+uint8  attempt                         # 시도 횟수
 ---
 # ---- Result ----
 bool success                           # 성공 여부
