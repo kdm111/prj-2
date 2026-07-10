@@ -12,3 +12,7 @@ __pycache__/
 .vscode/
 .claude
 .DS_Store
+
+
+# third_party
+src/third_party/

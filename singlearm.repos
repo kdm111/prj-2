@@ -1,0 +1,17 @@
+repositories:
+  third_party/open_manipulator:
+    type: git
+    url: https://github.com/ROBOTIS-GIT/open_manipulator.git
+    version: jazzy
+  third_party/dynamixel_hardware_interface:
+    type: git
+    url: https://github.com/ROBOTIS-GIT/dynamixel_hardware_interface.git
+    version: main
+  third_party/robotis_interfaces:
+    type: git
+    url: https://github.com/ROBOTIS-GIT/robotis_interfaces.git
+    version: main
+  third_party/dynamixel_interfaces:
+    type: git
+    url: https://github.com/ROBOTIS-GIT/dynamixel_interfaces.git
+    version: main

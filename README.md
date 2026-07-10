@@ -84,3 +84,140 @@ arm_agent/__init_-.py :
 파이썬 패키지다 표시. 파이썬 규칙으로 import가 가능하고 비어 있어도 이 파일이 모듈로 인식될수 있도록 표시
 
 
+## 2일차
+
+1. 액션 계약 확정
+LLM 에이전트가 tool 스키마가 스킬 서버 인터페이스에 묶여있게 설계 되어 확정했다.
+Pick/Place/MoveTo 액션의 결과를 success와 FailureReport로 통일했다. 이걸로 실패의 정보 출처를 하나로 통일하였다.
+MoveTo는 SRDF에 이름 붙인 관절값으로 이동한다. 목표가 이미 관절 공간에 있으므로 IK를 풀지 않는다. 다만 현재 자세는 매번 다르므로 경로는 매 호출마다 플래너가 새로 생성한다. 
+애초에 못잡는 GRASP_FAILED와 놓치는 GRIPPER_EMPTY를 분리하였다. 서로의 복구 동작을 다르게 할 계획이다.
+goal에 시도횟수 attempt를 추가하였다. AI Agent가 가지고 있고, 서버는 오직 실행만 한다.
+
+2. 로보티즈의 스택을 그대로 사용하기 위해 조사하여 의존성을 설치했다.
+
+3. 컨테이너 구조
+gazebo와 moveit을 띄우려면 ros:jazzy-ros-base에 없는 게 많다. move_group은 자주 재시작하는데 gazebo까지 죽으면 씬이 초기화된다.
+sim/moveit 두 서비스가 동일한 sim 이미지를 공유한다. 
+
+Dockerfile : 레시피 : 우분투 깔고 읽고 등등
+이미지 : 다 만들어진 파일시스템 스냅샷 이를 통해 docker build가 보고 만든다.
+컨테이너 : 이미지를 실행한 프로세스
+서비스 : compose의 선언. 이 이미지로 이런 이름의 컨테이너를 이 볼륨과 이 환경 변수로 띄워라. 
+
+세 컨테이너가 같은 브릿지 네트워크에 있고 ROS_DOMAIN_ID가 같다. 
+
+4. 벤더 스택 실행
+벤더 : 자기 회사 로봇을 ROS에서 쓸 수 있도록 같이 배포하는 소프트웨어 묶음. 그것이 벤더 스택
+/ws에서 실행하는 소프트웨어는 출처가 세 갈래이다.
+
+나의 코드
+ * arm_interfaces # 내가 정의한 인터페이스
+ * arm_agent : LLM 에이전트
+벤더 스택 src/third_party
+ * open_manipulator_description : URDF/xacro, 메시, 링크 치수
+ * open_manipulator_bringup : launch, hardware_controller
+ * open_manipulator_moveit_config : SRDF, kinematics.yaml, ompl_planning
+ * dynamixel_hardware_interface : 
+ * dynamixel_interfaces : 
+오픈소스 생태계 apt
+ * ros2_control, joint_trajectory_controller, GripperActionController
+ * MovIt2, OMPL
+ * Gazebo Harmonic, gz_ros2_control, ros_gz_bridge
+ * DDS(rmw)
+커널 : 호스트 우분투
+
+벤더 스택이 오픈소스 생태계에 관절은 5개이고 조인트 리밋은 이거고, 컨트로러는 이렇게 붙여라. 를 알려준다.
+데이터에 가까우며, URDF, SRDF, YAML, launch
+
+Gazebo는 sim에 설치, move_group과 Rviz는 moveit에 두 컨테이너는 파일시스템과 프로세스 공간이 격리되어 있다.
+
+DDS가 컨테이너의 경계를 넘어 moveit의 move_group이 sim의 /joint_states를 보고, /arm_controller/follow_joint_trajectory 액션 서버를 찾아 궤적을 보낸다.
+
+MoveIt 썼습니다에서
+MoveIt의 OMPL 플래너가 만든 궤적을 우리 스킬 서버가 액션으로 받아 실행하고, 실패 시 FailureReport로 구조화해서 에이전트에 올립니다.
+
+로봇 회사의 OMX 스택을 무수정으로 재사용하되, 실행환경을 도커 컴포즈의 두 컨테이너로 분리한다. 컨테이너 경계를 넘어 DDS 디스커버리가 동작함을 확인하고, RViz에서 plan & Execute한 궤적이 Gazebo의 팔을 움직이는 것으로 스택 전체가 연결됨을 검증했다. 직접 작성한 것은 Dockerfile, compose 정의, 의존성 고정(.repos)이며 로봇 설정 파일은 고치지 않았다.
+
+5. MoveIt2를 이루는 파일들
+MoveIt2는 여러 설정 파일을 조립해서 move_group이라는 노드를 만들어내는 프레임워크. omx_f_moveit.launch.py, MoveItConfigsBuilder 가하는 일이 그 조립이다.
+
+1. URDF - 로봇의 몸
+URDF는 링크(뼈)와 조인트(관절)의 트리로 이루어여 있다.
+링크 이름, 관절 이름/타입/축/한계, 오프셋, 관성(mass, inertia), 충돌 형상, 시각 메시. **로봇이 물리적으로 어떻게 생겼는가?**
+```
+<joint name="" type=""> 
+  <origin xyz="0 0 0.01">
+  <limit>
+</joint>
+```
+name이라는 회전관절이고 부모로부터 10mm 올라간 곳에 붙어 있다.
+origind은 링크의 치수이다. 관절에서 나오는 **origin 링크의 치수들을 통해 해석적 IK를 유도**할 수 있다.
+순기구학(FK)는 오프셋 값들을 관절각으로 회전시켜 차례로 곱해 나가는 것이고, 역기구학(IK)는 그 반대를 푸는 것이다.
+
+2. SRDF(Semantic Robot Description Format) - URDF만으로 설명이 안되는 것들
+이 로봇을 어떻게 다룰지에 대한 의미론(semantics)
+
+그룹 : 어느 관절들을 한 덩어리로 계획할 것인가?
+```
+<group name="arm"> joint1~5 + end_effector_joint
+<group name="gripper"> gripper_joint_1, gripper_joint_2
+```
+URDF는 관절 8개가 트리로 연결되어 있다는 것만 알고 있다. 팔 5개는 같이 계획하고 그리퍼는 따로다 라는 걸 쓸 자리가 없다.
+
+
+명명 자세(group state) : MoveTo의 target_name
+```
+<group_state name="home" group="arm">
+  <joint name="joint2" value="-1.57">
+```
+MoveTo 액션이 조회할 표.
+
+수동 관절 
+```
+<passive_joint name="gripper_joint_2">
+```
+이 관절은 모터가 없다. 따라 움직인다. 그래서 gripper_controller가 gripoper_joint_1 하나만 잡는다.
+
+가상 관절
+```
+<virtual_joint name="world_fixed" type="fixed" parent_frame="world" child_link="link0"/>
+```
+로봇 밑동은 세상에 고정되어 있다. 모바일 로봇이라면 floating이 된다.
+
+충돌 무시 쌍
+link2, link3은 항상 붙어 있으니 충돌 검사에서 빼라. 이게 없으면 플래너가 자기 자신과 충돌한다고 판단해서 경로를 찾을 수 없다.
+
+3. kinematics.yaml : IK를 누가 푸는가
+```
+arm:
+  kinematics_solver : kdl_kinematics_plugin/KDLKinematicsPlugin
+  kenematics_solver_timeout: 0.005
+  position_only_ik: True
+```
+KDLKinematicsPlugin은 수치해석적 IK이다. 해를 유도하는 것이 아니라 목표에 가까워질 때까지 조금씩 고쳐나간다. 초기 값에 따라 성공 실패가 나뉘고, 같은 목표를 두 번 풀면 다른 답이 나올 수 있다. 나의 해석적 IK가 비교당할 상대.
+하지만 `position_only_ik: True`위치 세 개만 맞추고 그리퍼가 어느쪽을 향하는 지는 신경 쓰지 않는다. 5축으로는 6D 포즈(위치 3 + 방향 3) 방정식이 6개인데 미지수가 5개여서 맞출 수가 없다.
+하지만 피킹의 경우 그리퍼가 아래를 향해야 한다. 팔이 옆으로 누워서 블록 위치에 손목을 갖다대고 도착했다 라고 생각할 수 있다.
+
+**우리는 임의의 방향 문제를 푸는것이 아니다. 그리퍼가 아래로 향하는 것과 손이 블록으로 정렬되는 것이다. 임의의 방향이 아니다**
+
+4. ompl_planning.yaml
+Open Motion Planning Library, RRT, RRT-Connect, PRM 같은 샘플링 기반 플래너들의 모음집이다.
+관절 공간에 무작위 점을 뿌리고 충돌 없는 것들을 이어붙이는 것
+
+CheckStartStateCollision : 시작 자세부터 충돌이면 계획하지 말아라
+OMPL : 경로(공간상의 점)를 찾는다. 시간 개념이 없다.
+AddTimeOptimalParameterization : 그 점들에 시각과 속도를 붙여 궤적으로 만든다. 이때 joint_limits.의 속도/가속도의 한계를 지킨다.
+
+경로는 어디를 지나는가 궤적은 언제 거기 있는가 
+
+5. joint_limits.yaml
+default_velocity_scaling_factor: 0.1
+default_acceleration_scaling_factor: 0.1
+
+URDF에도 limit velocity가 있지만 그건 하드웨어 최대치이고 이 파일로 덮어쓰거나 축소한다. 
+데모 영상에서 팔이 느리게 움직인다면 이 숫자 때문이다.
+
+결론
+move_group은 이 전부를 파라미터로 받아서 뜨는 하나의 노드이다. 스킬 서버가 말을 걸 상대가 된다.
+
+
