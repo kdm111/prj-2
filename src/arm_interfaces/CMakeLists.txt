@@ -28,6 +28,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   # 메시지
   "msg/ErrorCode.msg"
   "msg/FailureReport.msg"
+  "msg/Stage.msg"
   # 액션
   "action/Pick.action"
   "action/Place.action"
