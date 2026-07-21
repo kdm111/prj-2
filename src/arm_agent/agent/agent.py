@@ -13,7 +13,7 @@ from rclpy.node import Node
 from std_msgs.msg import String
 
 from rclpy.action import ActionClient
-from arm_interfaces.action import MoveTo
+from arm_interfaces.action import MoveTo, Pick, Place
 
 class Agent(Node): # Node 상속
     def __init__(self):
@@ -29,15 +29,44 @@ class Agent(Node): # Node 상속
             MoveTo, # 액션 타입
             'move_to' # 액션 명칭
         )
-    # 명령어가 들어오면 처리하고 핵션 서버로 보냄
-    def on_command(self, msg): # 콜백 함수에는 메시지 객체가 전부 들어온다. 
-        target = msg.data # 명령 전체를 자세 이름으로 취급
-        self._move_to_client.wait_for_server() # 서버 뜰 때까지 대기
-        goal = MoveTo.Goal()
-        goal.target_name = target
-        goal.attempt = 1 # 시도 횟수는 agent가 센다.
-        goal_future = self._move_to_client.send_goal_async(goal) # goal을 쏜 후에 날라올 값
-        goal_future.add_done_callback(self.on_goal_response) # 수락 여부 콜백
+        self._pick_client = ActionClient(
+            self,
+            Pick,
+            'pick'
+        )
+        self._place_client = ActionClient(
+            self,
+            Place,
+            'place'
+        )
+
+    # 해당 액션 서버로 보내는 라우터
+    def on_command(self, msg): 
+        parts = msg.data.split()
+        if not parts:
+            return
+        skill = parts[0]
+        if skill == 'move_to' and len(parts) == 2:
+            client =self._move_to_client
+            goal = MoveTo.Goal()
+            goal.target_name = parts[1]
+        elif skill == 'pick' and len(parts) == 2:
+            client = self._pick_client
+            goal = Pick.Goal()
+            goal.object_id = parts[1]
+        elif skill == 'place' and len(parts) == 3:
+            client = self._place_client
+            goal = Place.Goal()
+            goal.object_id = parts[1]
+            goal.target_id = parts[2]
+        else:
+            self.get_logger().warn(f'등록 되지 않은 명령: {" ".join(parts)}')
+            return
+        goal.attempt = 1 # 어떤 행동이건 처음 시작하는 동작은 항상 1부터 시작
+        client.wait_for_server()
+        goal_future = client.send_goal_async(goal)
+        goal_future.add_done_callback(self.on_goal_response)
+        
 
     # 수락 되면 결과값 처리
     def on_goal_response(self, goal_future):
