@@ -15,7 +15,10 @@ from std_msgs.msg import String
 from rclpy.action import ActionClient
 from arm_interfaces.action import MoveTo, Pick, Place
 
+from arm_interfaces.msg import ErrorCode
+
 MAX_ATTEMPTS = 3
+ABORT_CODES ={ErrorCode.UNREACHABLE, ErrorCode.INTERNAL_ERROR}
 
 class Agent(Node): # Node 상속
     def __init__(self):
@@ -108,8 +111,10 @@ class Agent(Node): # Node 상속
         result_future.add_done_callback(self.on_result) # 결과 콜백
 
     # 결과값 콜백과 시퀀스 다음 스텝 실행
+    # 에러 코드에 따른 복구 전략 변경
     def on_result(self, result_future):
         result = result_future.result().result
+        code = result.failure.code
         if result.success:
             self._step += 1
             self._attempt = 1
@@ -117,6 +122,9 @@ class Agent(Node): # Node 상속
                 f'결과 : success={result.success}, code={result.failure.code}'
             )
             self._run_step()
+        if code in ABORT_CODES:
+            self.get_logger().error(f'복구 불가 코드(code={code}) > 즉시 중단')
+            return
         if self._attempt < MAX_ATTEMPTS:
             self._attempt += 1
             self.get_logger().warn(f'실패(code={result.failure.code}) > 재시도 attempt={self._attempt}')
