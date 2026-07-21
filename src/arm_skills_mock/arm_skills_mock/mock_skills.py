@@ -12,7 +12,7 @@ from arm_interfaces.msg import ErrorCode, FailureReport, Stage
 
 import time
 from rclpy.action import ActionServer
-from arm_interfaces.action import MoveTo
+from arm_interfaces.action import MoveTo, Pick, Place
 
 STAGES = {
     'pick' : [Stage.PLAN, Stage.APPROACH, Stage.GRASP, Stage.LIFT],
@@ -48,7 +48,20 @@ class MockSkills(Node):
             'move_to', # 액션 이름(상대 이름)
             self.execute_move_to, # 목표를 받으면 실행할 콜백
         )
-    
+        self._pick_server = ActionServer(
+            self, # 액션 서버가 붙을 노드
+            Pick, # 액션 타입
+            'pick',# 액션 이름(상대 이름)
+            self.execute_pick # 목표를 받으면 실행할 콜백
+        )
+        self._place_server = ActionServer(
+            self, # 액션 서버가 붙을 노드
+            Place, # 액션 타입
+            'place', # 액션 이름
+            self.execute_place # 받으면 실행할 콜백
+        )
+    # goal_handle, 액션 이름, 액션 타입, 제어, 목표
+    # obejct_id는 함수의 의미, target은 로그용
     def _execute(self, goal_handle, name, action_type, object_id, target):
         """
         action을 받으면 실행되는 callback 함수
@@ -95,6 +108,14 @@ class MockSkills(Node):
     def execute_move_to(self, goal_handle):
         return self._execute(goal_handle, 'move_to', MoveTo, '', goal_handle.request.target_name)
     
+    def execute_pick(self, goal_handle):
+        goal = goal_handle.request
+        return self._execute(goal_handle, 'pick', Pick, goal.object_id, goal.object_id)
+    
+    def execute_place(self, goal_handle):
+        goal = goal_handle.request
+        return self._execute(goal_handle, 'place', Place, goal.object_id, goal.target_id)
+    
     def make_failure(self, code, stage, object_id, detail, attempt):
         """
         FailureReport를 만드는 유일한 통로
@@ -110,7 +131,7 @@ class MockSkills(Node):
         return report
     
 
-def main(args=None):
+def main(args=None):#
     rclpy.init(args=args)
     mock_skills = MockSkills()
     rclpy.spin(mock_skills)
