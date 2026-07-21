@@ -15,6 +15,8 @@ from std_msgs.msg import String
 from rclpy.action import ActionClient
 from arm_interfaces.action import MoveTo, Pick, Place
 
+MAX_ATTEMPTS = 3
+
 class Agent(Node): # Node 상속
     def __init__(self):
         super().__init__('agent') # 부모 생성자 호출 및 노드 이름 
@@ -53,8 +55,9 @@ class Agent(Node): # Node 상속
             return 
         self._plan = plan # 실행할 스텝들
         self._step = 0 # 지금 몇 번째
+        self._attempt = 1 # 현재 시도 횟수
         self._run_step()
-        
+
     # 계획을 만드는 함수
     def _build_plan(self, parts):
         skill = parts[0]
@@ -89,22 +92,10 @@ class Agent(Node): # Node 상속
             self.get_logger().info('시퀀스 완료')
             return
         client, goal = self._plan[self._step]
-        goal.attempt = 1
+        goal.attempt = self._attempt
         client.wait_for_server()
         goal_future = client.send_goal_async(goal)
         goal_future.add_done_callback(self.on_goal_response)
-
-    # 결과값 콜백과 시퀀스 다음 스텝 실행
-    def on_result(self, result_future):
-        result = result_future.result().result
-        self.get_logger().info(
-            f'결과 : success={result.success}, code={result.failure.code}'
-        )
-        if not result.success:
-            self.get_logger().warn('시퀀스 중단 (실패)') # 여기에서 복구 로직실행
-            return
-        self._step += 1
-        self._run_step()
 
     # 수락 되면 결과값 처리
     def on_goal_response(self, goal_future):
@@ -115,6 +106,26 @@ class Agent(Node): # Node 상속
         self.get_logger().info('goal 수락됨')
         result_future = goal_handle.get_result_async()
         result_future.add_done_callback(self.on_result) # 결과 콜백
+
+    # 결과값 콜백과 시퀀스 다음 스텝 실행
+    def on_result(self, result_future):
+        result = result_future.result().result
+        if result.success:
+            self._step += 1
+            self._attempt = 1
+            self.get_logger().info(
+                f'결과 : success={result.success}, code={result.failure.code}'
+            )
+            self._run_step()
+        if self._attempt < MAX_ATTEMPTS:
+            self._attempt += 1
+            self.get_logger().warn(f'실패(code={result.failure.code}) > 재시도 attempt={self._attempt}')
+            self._run_step()
+        else:
+            self.get_logger().error(f'복구 실패 > 시퀀스 중단(ABORT), code={result.failure.code}')
+            return
+
+
 
 
 
