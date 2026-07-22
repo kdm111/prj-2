@@ -1,8 +1,8 @@
-# 핸드오프 v3 — 자가 복구 피킹 셀
+# 핸드오프 v4 — 자가 복구 피킹 셀
 
 > AI 어시스턴트 간 컨텍스트 동기화용 문서. 대화가 바뀌거나 다른 도구로 넘어갈 때 이 파일을 먼저 읽힌다.
-> 최종 갱신: 2026-07-10 (W1 목요일 밤)
-> v2 대비 변경: 벤더 스택 실측 검증(§2), 개발 환경 규칙 신설(§3), mock 서버 진행(§6), 갭 조치 갱신(§8)
+> 최종 갱신: 2026-07-22
+> v3 대비 변경: mock 스킬 서버 3종 완성(§6.1), Place.object_id 결정 확정(§6.4), **에이전트 명령 라우팅 + 복구 루프 신설(§6.5) — 여기에 알려진 버그 1건**, 레포/로드맵/첫 행동 갱신(§5·§9·§11)
 
 ---
 
@@ -274,15 +274,16 @@ personal_project/
 ├── HANDOFF.md                 # 이 파일
 ├── w1_sim_bringup_{1,2}.webm  # W1 데모 영상 (docs/media/ 로 옮길 것)
 └── src/
-    ├── arm_interfaces/        # ament_cmake — 계약 (닫힘)
+    ├── arm_interfaces/        # ament_cmake — 계약 (닫힘). Place.action에 object_id 추가됨(§6.4)
     │   ├── action/{Pick,Place,MoveTo}.action
     │   └── msg/{FailureReport,ErrorCode,Stage}.msg
-    ├── arm_agent/             # ament_python — /command 구독 스텁 (아직 미개발)
-    ├── arm_skills_mock/       # ament_python — mock 스킬 서버 (진행 중)
+    ├── arm_agent/             # ament_python — /command 라우팅 + 복구 루프 (§6.5, 알려진 버그 1건)
+    ├── arm_skills_mock/       # ament_python — mock 스킬 서버 3종 완성 (§6.1)
     └── third_party/           # gitignore. vcs import 로 재현
 ```
 
-커밋 히스토리 (최신순): `mock 서버: move_to 액션 서버 + 실패 주입` / `Stage 메시지 추가` / `컨테이너별 moveit, sim 생성 후 동작 확인` / `action 시도 횟수 추가` / `single arm으로 docker container 변경` / `FailureReport 추가` / `agent 노드 생성` / `로봇 작업 인터페이스 선언`
+커밋 히스토리 (최신순, v4 시점):
+`복구 불가 코드일 시 재시도 즉시 중단` / `agent 최대 실패 횟수 추가 및 오버 시 전체 종료` / `deliver(pick+place) 시퀀스 생성` / `agent pick, place 라우팅` / `move_to 액션 클라이언트 추가` / `pick, place 액션 서버 추가(성공·실패 케이스 확인)` / `mock skills 일반화 + 핸드오프 정리(v3)` / `Stage 메시지 추가` / `컨테이너별 moveit, sim 생성` / `FailureReport 추가` / `agent 노드 생성` / `로봇 작업 인터페이스 선언`
 
 ---
 
@@ -293,34 +294,27 @@ Python 노드 하나가 `Pick`/`Place`/`MoveTo` 액션 서버 3개를 띄우되,
 
 **이유:** ① 에이전트의 복구 루프를 W1에 검증 가능 ② W3에서 진짜 C++ 서버로 갈아끼울 때 **에이전트 코드 무수정** ③ 복구 전략을 **결정론적으로** 검증(실제 파지 실패는 비결정적이라 디버깅이 지옥).
 
-### 6.1 현재 상태
+### 6.1 현재 상태 — ✅ 3종 완성 (v4)
 
-- ✅ `_execute(goal_handle, name, action_type, object_id, target)` — 액션 3종 공통 로직. 내부에 `MoveTo` 등 특정 액션 이름이 없다.
+- ✅ `_execute(goal_handle, name, action_type, object_id, target)` — 액션 3종 공통 로직. 내부에 특정 액션 이름이 없다.
 - ✅ `make_failure(code, stage, object_id, detail, attempt)` — `FailureReport`의 유일한 생성 통로. `stamp`는 `self.get_clock().now().to_msg()`.
-- ✅ 파라미터 12개 선언 (`{pick,place,move_to}.{duration_sec,fail_until_attempt,fail_code,fail_stage}`)
-- ✅ `move_to` 액션 서버 동작. 실패 주입 검증 완료:
+- ✅ 파라미터 12개 선언 (`{pick,place,move_to}.{duration_sec,fail_until_attempt,fail_code,fail_stage}`). `DEFAULTS` 딕셔너리로 스킬별 기본 `fail_code`/`fail_stage`를 다르게 준다 (pick→GRASP_FAILED@GRASP, place/move_to→PLANNING_FAILED@PLAN).
+- ✅ `STAGES` 딕셔너리로 스킬별 단계 시퀀스 정의. `_execute`가 이를 순회하며 매 단계 feedback 발행(`progress = i/len`).
+- ✅ `move_to` / `pick` / `place` 세 액션 서버 모두 동작. 성공·실패 케이스 확인 완료.
   ```
   attempt=1                         → SUCCEEDED
   param set move_to.fail_until_attempt 1
   attempt=1  [PLAN] 실패 주입 code=3 → ABORTED, failure.attempt=1
   attempt=2  [PLAN][EXECUTE]        → SUCCEEDED
   ```
-- ⬜ `pick` / `place` 액션 서버 (껍데기 + `ActionServer` 한 줄씩)
 
-### 6.2 남은 작업
+`execute_pick`/`execute_place`/`execute_move_to`는 얇은 어댑터 — 각자 `goal`에서 `object_id`/`target`을 뽑아 `_execute`로 넘길 뿐.
 
-```python
-# 1) pick 추가
-self._pick_server = ActionServer(self, Pick, 'pick', self.execute_pick)
+`object_id`와 `target`을 나눈 이유: `object_id`는 `FailureReport`의 필드로 **의미가 정해져 있다**(실패의 대상이 된 물체). `move_to`의 `home`은 물체가 아니라 자세이므로 빈 문자열. `target`은 순전히 로그/`detail`용.
 
-def execute_pick(self, goal_handle):
-    goal = goal_handle.request
-    return self._execute(goal_handle, 'pick', Pick, goal.object_id, goal.object_id)
+### 6.2 mock 서버 남은 작업 — 없음 (계약대로 완성)
 
-# 2) place 추가 (object_id는 빈 문자열, target은 goal.target_id)
-```
-
-`object_id`와 `target`을 나눈 이유: `object_id`는 `FailureReport`의 필드로 **의미가 정해져 있다**(실패의 대상이 된 물체). `move_to`의 `home`, `place`의 `tray`는 물체가 아니라 자세·장소이므로 넣으면 안 된다. `target`은 순전히 로그/`detail`용.
+W3에서 이 파일을 진짜 C++ 서버로 교체할 때 에이전트 코드는 손대지 않는다. 남은 것은 §6.3의 실행기 전환(취소·동시 목표 처리 시 `MultiThreadedExecutor`)뿐이며, 목표를 하나씩 보내는 현재 흐름에선 불필요.
 
 ### 6.3 mock 설계 결정
 
@@ -330,20 +324,59 @@ def execute_pick(self, goal_handle):
 - **실행기는 아직 기본 `rclpy.spin(node)`.** `time.sleep`이 막지만 목표를 하나씩 보내면 문제없다. **액션 3개 + 취소 처리를 넣을 때 `MultiThreadedExecutor` + `ReentrantCallbackGroup`으로 전환.** W3의 C++ 서버도 MoveIt 호출이 블로킹이라 같은 구조가 필요.
 - **콜백에서 예외가 나면 rclpy가 자동으로 `ABORTED` 처리**하되 Result는 기본값(`success=false`, `code=0`)이라 계약상 모순(`success=false`인데 `code==SUCCESS`). W3 서버는 `try/except`로 감싸 `INTERNAL_ERROR(99)`를 채울 것.
 
-### 6.4 미결 결정 — 다음 세션 첫 안건
+### 6.4 미결 결정 — ✅ 확정 (v4)
 
-**`Place.action` goal에 `string object_id`를 추가할 것인가?**
-
-운반 중 낙하(`GRIPPER_EMPTY`)가 나면 `FailureReport.object_id`가 빈 문자열이라 **무엇을 떨어뜨렸는지 로그에 안 남는다.** `FailureReport`가 "에이전트의 행동 역추적을 위한 메시지"라는 커밋 메시지를 생각하면 손실이다.
+**`Place.action` goal에 `string object_id`를 추가했다.** (v3의 미결 안건 → 추가하는 쪽으로 결정)
 
 ```
-# Place goal (제안)
+# Place goal (확정)
 string object_id     # 지금 들고 있는 물체
 string target_id     # 놓을 곳
 uint8  attempt
 ```
 
-에이전트는 어차피 아는 값이고, W3 서버는 놓은 뒤 `/scene_state`를 갱신할 때 결국 필요해진다. **지금이 싸다** (계약 + mock만 수정). W3엔 에이전트와 C++ 서버까지 세 군데.
+이유(그대로): 운반 중 낙하(`GRIPPER_EMPTY`)가 나면 `FailureReport.object_id`가 채워져 **무엇을 떨어뜨렸는지 로그에 남는다.** 에이전트는 어차피 아는 값이고, W3 서버가 놓은 뒤 `/scene_state`를 갱신할 때 결국 필요하다. 계약(`Place.action`)·mock(`execute_place`)·에이전트(`_build_plan`의 place/deliver) 세 군데 모두 반영 완료.
+
+### 6.5 에이전트 — 명령 라우팅 + 복구 루프 (신규, v4)
+
+`arm_agent`가 v3의 "`/command` 듣고 로그만 찍는 스텁"에서 **명령을 스킬 시퀀스로 라우팅하고 실패를 재시도하는 상태 기계**로 자랐다. 아직 mock 상대. LLM은 아직 안 붙음(문자열 파싱이 대역).
+
+**클라이언트:** `MoveTo`/`Pick`/`Place` 액션 클라이언트 3종.
+
+**`/command` 문법 (문자열, 공백 분리):**
+
+| 명령 | 매핑 | 비고 |
+| --- | --- | --- |
+| `move_to <name>` | `MoveTo(target_name)` | 1스텝 |
+| `pick <id>` | `Pick(object_id)` | 1스텝 |
+| `place <id> <target>` | `Place(object_id, target_id)` | 1스텝 |
+| `deliver <id> <target>` | `Pick` → `Place` | **2스텝 시퀀스** |
+
+`_build_plan`이 명령을 `[(client, goal), ...]` 리스트로 만들고, `_run_step`이 하나씩 비동기로 보낸다. `on_goal_response`(수락 확인) → `on_result`(결과) 콜백 체인.
+
+**복구 루프 상태:** `self._plan`(스텝들), `self._step`(현재 인덱스), `self._attempt`(1부터). `attempt`는 **에이전트가 세서** goal에 실어 보낸다 — 계약대로 서버는 무상태(§4.1).
+
+**복구 정책 (현재):**
+- `MAX_ATTEMPTS = 3`
+- `ABORT_CODES = {UNREACHABLE, INTERNAL_ERROR}` → 즉시 중단(재시도 안 함). §4.3 표의 ABORT 전략을 코드로 옮긴 것.
+- 성공 → 다음 스텝, `attempt` 리셋(=1).
+- 실패 & 복구 가능 코드 & `attempt < MAX` → `attempt += 1` 후 같은 스텝 재시도.
+- `attempt` 상한 초과 → 시퀀스 ABORT.
+
+> ⚠️ 아직 stage/attempt 기반의 세분화(RETRY/REGRASP/RESCAN 구분)는 없다 — "성공이냐, 재시도냐, 중단이냐"의 3분기뿐. 그 정교화는 W5 본편.
+
+### 6.6 ⚠️ 알려진 버그 — `on_result` 성공 경로 fall-through (다음 세션 첫 수리)
+
+`src/arm_agent/agent/agent.py`의 `on_result`가 `if result.success:` 블록 끝에서 **`return`을 안 하고 아래 재시도 분기로 떨어진다.** `if`가 연달아 있고 `elif`가 아니라서 생긴 제어흐름 버그.
+
+성공 시 추적:
+1. `result.success` → `step += 1`, `attempt = 1`, `_run_step()` (다음 스텝 goal 전송)
+2. fall-through: `code`(=SUCCESS=0) ∈ `ABORT_CODES`? 아님 → 통과
+3. `attempt(=1) < MAX(3)`? 참 → `attempt = 2`, `"실패…재시도"` **오탐 경고 로그** + `_run_step()` **한 번 더 호출**
+
+결과: 성공할 때마다 다음 스텝 goal이 **두 번** 전송되고, 마지막 스텝에서 `"시퀀스 완료"`가 두 번 찍힌다.
+
+**수리 방향(사용자가 타이핑):** `if result.success:` 블록 끝에 `return`을 넣거나, 뒤의 두 `if`를 `elif`로 바꿔 세 경로를 배타적으로 만든다. (읽고 추적해 찾은 것 — 실행으로 재현해 확인 후 고칠 것. §0: 추측 말고 확인.)
 
 ---
 
@@ -395,7 +428,7 @@ uint8  attempt
 
 | 주차 | 기간 | 목표 | 산출물 |
 | --- | --- | --- | --- |
-| **W1** | 7/7–7/13 | 계약 ✅ / sim+moveit 구동 ✅ / mock 스킬 서버(진행 중) / G5 CI | 인터페이스 커밋 ✅ + sim 구동 영상(재촬영 필요) |
+| **W1** | 7/7–7/13 | 계약 ✅ / sim+moveit 구동 ✅ / **mock 스킬 서버 3종 ✅** / **에이전트 라우팅+복구 루프 ✅(§6.5, 버그 1건)** / G5 CI(미착수) | 인터페이스 커밋 ✅ + sim 구동 영상(재촬영 필요) |
 | W2 | 7/14–7/20 | ros2_control 해부 문서(§2.5 기반). **해석적 5-DOF IK** 유도 + C++ 구현 + gtest FK 왕복 검증(KDL 대비 성공률·시간). G2 SceneState, G3 ABORT. 루프 주기/지터 측정 | IK 유도 문서 + 벤치마크 표 |
 | W3 | 7/21–7/27 | C++ 스킬 서버 3종(MoveGroupInterface). `make_failure` 헬퍼. 텍스트 명령 → sim pick E2E ★수직 슬라이스 | E2E 영상 |
 | W4 | 7/28–8/3 | 웹캠 + ArUco → 6D 포즈 → `/scene_state`. agent 실스킬 연결. G4, G8 | "빨간 블록 트레이에" 데모 |
@@ -426,7 +459,7 @@ uint8  attempt
 ## 11. 다른 AI를 위한 첫 행동 지침
 
 1. **§0 협업 방식을 지킨다.** 코드를 대신 쓰지 말 것. 단계를 잘게 쪼갤 것. **확인하지 않은 API 동작을 단정하지 말 것.**
-2. 지금이 W1 금~일이면: **§6.4 `Place.object_id` 결정 → `pick`/`place` 액션 서버 추가 → G5 CI → 영상 재촬영** 순.
+2. **다음 세션 순서: (a) §6.6 `on_result` fall-through 버그 재현·수리 → (b) mock 상대로 `deliver`/재시도/ABORT 3분기 E2E 검증 → (c) 그 다음은 로드맵 W2(해석적 IK·SceneState·ABORT 확정) 또는 W3(C++ 스킬 서버) 착수.** 오늘 날짜(7/22) 기준 일정상 W2/W3 구간이며 W1 잔여(에이전트)가 마무리 단계다. G5 CI와 sim 영상 재촬영은 여전히 미결.
 3. **"OMX"와 "OpenMANIPULATOR-X"를 절대 혼용하지 말 것 (§2.1).**
 4. **계약(§4)의 상수값·필드는 사용자 확인 없이 변경 제안하지 말 것.** 추가는 뒤 번호로만.
 5. **개발 환경 규칙(§3.1)을 어기지 말 것.** 특히 "빌드는 `sim` 컨테이너", "`src/` 파일 생성은 호스트".
