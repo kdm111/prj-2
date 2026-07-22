@@ -122,16 +122,14 @@ class Agent(Node): # Node 상속
                 f'결과 : success={result.success}, code={result.failure.code}'
             )
             self._run_step()
-        if code in ABORT_CODES:
+        elif code in ABORT_CODES:
             self.get_logger().error(f'복구 불가 코드(code={code}) > 즉시 중단')
-            return
-        if self._attempt < MAX_ATTEMPTS:
+        elif self._attempt < MAX_ATTEMPTS:
             self._attempt += 1
             self.get_logger().warn(f'실패(code={result.failure.code}) > 재시도 attempt={self._attempt}')
             self._run_step()
         else:
             self.get_logger().error(f'복구 실패 > 시퀀스 중단(ABORT), code={result.failure.code}')
-            return
 
 
 
