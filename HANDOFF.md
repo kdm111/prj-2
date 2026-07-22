@@ -277,7 +277,7 @@ personal_project/
     ├── arm_interfaces/        # ament_cmake — 계약 (닫힘). Place.action에 object_id 추가됨(§6.4)
     │   ├── action/{Pick,Place,MoveTo}.action
     │   └── msg/{FailureReport,ErrorCode,Stage}.msg
-    ├── arm_agent/             # ament_python — /command 라우팅 + 복구 루프 (§6.5, 알려진 버그 1건)
+    ├── arm_agent/             # ament_python — /command 라우팅 + 복구 루프 (§6.5, §6.6 버그 수정 완료)
     ├── arm_skills_mock/       # ament_python — mock 스킬 서버 3종 완성 (§6.1)
     └── third_party/           # gitignore. vcs import 로 재현
 ```
@@ -365,18 +365,13 @@ uint8  attempt
 
 > ⚠️ 아직 stage/attempt 기반의 세분화(RETRY/REGRASP/RESCAN 구분)는 없다 — "성공이냐, 재시도냐, 중단이냐"의 3분기뿐. 그 정교화는 W5 본편.
 
-### 6.6 ⚠️ 알려진 버그 — `on_result` 성공 경로 fall-through (다음 세션 첫 수리)
+### 6.6 ✅ 수정 완료 — `on_result` 성공 경로 fall-through (v4 버그, 2026-07-22 수리)
 
-`src/arm_agent/agent/agent.py`의 `on_result`가 `if result.success:` 블록 끝에서 **`return`을 안 하고 아래 재시도 분기로 떨어진다.** `if`가 연달아 있고 `elif`가 아니라서 생긴 제어흐름 버그.
+`on_result`의 결과 분기가 나란한 `if` 세 개라, 성공 경로가 `return` 없이 재시도 분기로 떨어져 **다음 스텝 goal이 두 번 전송**됐다. `deliver`에서 `place`가 attempt=1·2로 두 번 실행되는 것으로 mock 상대 재현 확인.
 
-성공 시 추적:
-1. `result.success` → `step += 1`, `attempt = 1`, `_run_step()` (다음 스텝 goal 전송)
-2. fall-through: `code`(=SUCCESS=0) ∈ `ABORT_CODES`? 아님 → 통과
-3. `attempt(=1) < MAX(3)`? 참 → `attempt = 2`, `"실패…재시도"` **오탐 경고 로그** + `_run_step()` **한 번 더 호출**
+**수리:** 뒤 두 `if`를 `elif`로 바꿔 **성공 / 즉시중단(ABORT_CODES) / 재시도 / 포기 네 갈래를 상호배타화**(핸드오프에서 논의한 안 B). 재현→수리→재확인까지 완료: 성공 시 "시퀀스 완료" 1회, 오탐 경고 0회, mock에 place 1회.
 
-결과: 성공할 때마다 다음 스텝 goal이 **두 번** 전송되고, 마지막 스텝에서 `"시퀀스 완료"`가 두 번 찍힌다.
-
-**수리 방향(사용자가 타이핑):** `if result.success:` 블록 끝에 `return`을 넣거나, 뒤의 두 `if`를 `elif`로 바꿔 세 경로를 배타적으로 만든다. (읽고 추적해 찾은 것 — 실행으로 재현해 확인 후 고칠 것. §0: 추측 말고 확인.)
+**교훈:** 상호배타적 결과는 나란한 `if`가 아니라 `elif`로 표현한다 — 증상(성공 블록에 `return` 추가, 안 A)이 아니라 구조로 원인을 제거.
 
 ---
 
@@ -428,7 +423,7 @@ uint8  attempt
 
 | 주차 | 기간 | 목표 | 산출물 |
 | --- | --- | --- | --- |
-| **W1** | 7/7–7/13 | 계약 ✅ / sim+moveit 구동 ✅ / **mock 스킬 서버 3종 ✅** / **에이전트 라우팅+복구 루프 ✅(§6.5, 버그 1건)** / G5 CI(미착수) | 인터페이스 커밋 ✅ + sim 구동 영상(재촬영 필요) |
+| **W1** | 7/7–7/13 | 계약 ✅ / sim+moveit 구동 ✅ / **mock 스킬 서버 3종 ✅** / **에이전트 라우팅+복구 루프 ✅(§6.5, §6.6 버그 수정)** / (b)분기검증 보류 / G5 CI(미착수) | 인터페이스 커밋 ✅ + sim 구동 영상(재촬영 필요) |
 | W2 | 7/14–7/20 | ros2_control 해부 문서(§2.5 기반). **해석적 5-DOF IK** 유도 + C++ 구현 + gtest FK 왕복 검증(KDL 대비 성공률·시간). G2 SceneState, G3 ABORT. 루프 주기/지터 측정 | IK 유도 문서 + 벤치마크 표 |
 | W3 | 7/21–7/27 | C++ 스킬 서버 3종(MoveGroupInterface). `make_failure` 헬퍼. 텍스트 명령 → sim pick E2E ★수직 슬라이스 | E2E 영상 |
 | W4 | 7/28–8/3 | 웹캠 + ArUco → 6D 포즈 → `/scene_state`. agent 실스킬 연결. G4, G8 | "빨간 블록 트레이에" 데모 |
@@ -459,7 +454,7 @@ uint8  attempt
 ## 11. 다른 AI를 위한 첫 행동 지침
 
 1. **§0 협업 방식을 지킨다.** 코드를 대신 쓰지 말 것. 단계를 잘게 쪼갤 것. **확인하지 않은 API 동작을 단정하지 말 것.**
-2. **다음 세션 순서: (a) §6.6 `on_result` fall-through 버그 재현·수리 → (b) mock 상대로 `deliver`/재시도/ABORT 3분기 E2E 검증 → (c) 그 다음은 로드맵 W2(해석적 IK·SceneState·ABORT 확정) 또는 W3(C++ 스킬 서버) 착수.** 오늘 날짜(7/22) 기준 일정상 W2/W3 구간이며 W1 잔여(에이전트)가 마무리 단계다. G5 CI와 sim 영상 재촬영은 여전히 미결.
+2. **진행 상황: (a) §6.6 fall-through 버그 ✅수리완료(2026-07-22) → (b) mock 상대 `deliver`/재시도/ABORT 3분기 E2E 검증은 ⏸️보류 — 성공 경로만 확인, 재시도·ABORT 두 분기 미검증(부채) → (c) 현재 W2 착수 중.** W2 첫 작업은 §2.4.2대로 **URDF `<axis>` 확인**(해석적 IK 서사의 전제, 확인 전 단정 금지). 이어서 해석적 5-DOF IK 유도·C++·gtest, SceneState(G2), ABORT 확정(G3). **미결 부채:** (b) 분기검증 / G5 CI / sim 영상 재촬영.
 3. **"OMX"와 "OpenMANIPULATOR-X"를 절대 혼용하지 말 것 (§2.1).**
 4. **계약(§4)의 상수값·필드는 사용자 확인 없이 변경 제안하지 말 것.** 추가는 뒤 번호로만.
 5. **개발 환경 규칙(§3.1)을 어기지 말 것.** 특히 "빌드는 `sim` 컨테이너", "`src/` 파일 생성은 호스트".
