@@ -13,7 +13,7 @@ double get_base_angle(double px, double py)
 }
 std::optional<double> get_elbow_angle(double d, double l1, double l2)
 {
-  double cos_theta = (l1 * l1 + l2 * l2 - d * d) / (2.0 * l1 * l2);
+  double cos_theta = (d * d - l1 * l1 - l2 * l2) / (2.0 * l1 * l2);
   if (std::fabs(cos_theta) > 1.0) {
     return std::nullopt;
   }
@@ -32,7 +32,7 @@ std::optional<double> get_shoulder_angle(double r, double z, double l1, double l
   double aim = std::atan2(z, r);
   // cos_beta로부터 실제 보정각. 팔꿈치가 접혀서 위팔이 더 들려야 하는 양
   double beta = std::acos(cos_beta);
-  return aim + beta;
+  return aim - beta;
 }
 Point2D get_wrist_point(double r, double z, double l3, double phi)
 {

@@ -37,7 +37,7 @@ TEST(ElbowAngle, StraitArm)
 {
   auto result = arm_kinematics::get_elbow_angle(2.0, 1.0, 1.0);
   ASSERT_TRUE(result.has_value());
-  EXPECT_NEAR(result.value(), M_PI, 1e-9);
+  EXPECT_NEAR(result.value(), 0.0, 1e-9);
 }
 TEST(ElbowAngle, Unreachable)
 {
@@ -48,13 +48,13 @@ TEST(ShoulderAngle, Diagonal)
 {
   auto result = arm_kinematics::get_shoulder_angle(1.0, 1.0, 1.0, 1.0);
   ASSERT_TRUE(result.has_value());
-  EXPECT_NEAR(result.value(), M_PI / 2, 1e-9);
+  EXPECT_NEAR(result.value(), 0.0, 1e-9);
 }
 TEST(ShoulderAngle, Horizontal)
 {
   auto result = arm_kinematics::get_shoulder_angle(std::sqrt(2.0), 0.0, 1.0, 1.0);
   ASSERT_TRUE(result.has_value());
-  EXPECT_NEAR(result.value(), M_PI / 4, 1e-9);
+  EXPECT_NEAR(result.value(), -M_PI / 4, 1e-9);
 }
 TEST(ShoulderAngle, Unreachable)
 {
@@ -94,4 +94,27 @@ TEST(ForwardKinematics, StraightUp)
   auto tip = arm_kinematics::get_forward_kinematics(M_PI / 2, 0.0, 0.0, 1.0, 1.0, 1.0);
   EXPECT_NEAR(tip.r, 0.0, 1e-9);
   EXPECT_NEAR(tip.z, 3.0, 1e-9);
+}
+TEST(RoundTrip, ElbowUpConfig)
+{
+  const double l1 = 1.0, l2 = 1.0, l3 = 0.5;
+  const double theta2 = 0.0, theta3 = M_PI / 3, theta4 = 0.0;   // 임의 입력 자세
+
+  // 각도 -> 손끝
+  auto tip = arm_kinematics::get_forward_kinematics(theta2, theta3, theta4, l1, l2, l3);
+  double phi = theta2 + theta3 + theta4;
+
+  // 손끝 -> 각도(역산)
+  auto wrist = arm_kinematics::get_wrist_point(tip.r, tip.z, l3, phi);
+  double d = arm_kinematics::get_reach_distance(wrist.r, wrist.z);
+  auto t3 = arm_kinematics::get_elbow_angle(d, l1, l2);
+  auto t2 = arm_kinematics::get_shoulder_angle(wrist.r, wrist.z, l1, l2);
+  ASSERT_TRUE(t3.has_value());
+  ASSERT_TRUE(t2.has_value());
+  double t4 = arm_kinematics::get_wrist_angle(phi, t2.value(), t3.value());
+
+  // 처음 각으로 돌아왔나?
+  EXPECT_NEAR(t2.value(), theta2, 1e-9);
+  EXPECT_NEAR(t3.value(), theta3, 1e-9);
+  EXPECT_NEAR(t4, theta4, 1e-9);
 }
