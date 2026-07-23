@@ -95,26 +95,30 @@ TEST(ForwardKinematics, StraightUp)
   EXPECT_NEAR(tip.r, 0.0, 1e-9);
   EXPECT_NEAR(tip.z, 3.0, 1e-9);
 }
-TEST(RoundTrip, ElbowUpConfig)
+// 어깨각, 팔꿈치각 손목값을 받아 순서대로 진행하는 테스트 전용 함수
+static void expect_round_trip(double theta2, double theta3, double theta4)
 {
   const double l1 = 1.0, l2 = 1.0, l3 = 0.5;
-  const double theta2 = 0.0, theta3 = M_PI / 3, theta4 = 0.0;   // 임의 입력 자세
-
-  // 각도 -> 손끝
   auto tip = arm_kinematics::get_forward_kinematics(theta2, theta3, theta4, l1, l2, l3);
   double phi = theta2 + theta3 + theta4;
 
-  // 손끝 -> 각도(역산)
   auto wrist = arm_kinematics::get_wrist_point(tip.r, tip.z, l3, phi);
   double d = arm_kinematics::get_reach_distance(wrist.r, wrist.z);
+
   auto t3 = arm_kinematics::get_elbow_angle(d, l1, l2);
   auto t2 = arm_kinematics::get_shoulder_angle(wrist.r, wrist.z, l1, l2);
   ASSERT_TRUE(t3.has_value());
   ASSERT_TRUE(t2.has_value());
   double t4 = arm_kinematics::get_wrist_angle(phi, t2.value(), t3.value());
 
-  // 처음 각으로 돌아왔나?
   EXPECT_NEAR(t2.value(), theta2, 1e-9);
   EXPECT_NEAR(t3.value(), theta3, 1e-9);
   EXPECT_NEAR(t4, theta4, 1e-9);
+}
+TEST(RoundTrip, VariousElbowUp)
+{
+  expect_round_trip(0.0, M_PI / 3, 0.0);
+  expect_round_trip(M_PI / 6, M_PI / 2, 0.0);
+  expect_round_trip(-M_PI / 6, M_PI / 3, M_PI / 6);
+  expect_round_trip(M_PI / 4, 2 * M_PI / 3, -M_PI / 4);
 }
