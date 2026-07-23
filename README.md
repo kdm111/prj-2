@@ -336,3 +336,13 @@ theta 3
 cos_theta = (l1^2 + l2^2 - d^2)/(2\*l1\*l2)
 std::fabs cmath의 double  전용 절대값. 소수가 잘리는 함정을 피하기 위함
 if (|cos| > 1) return nullopt : acos에 범위 밖을 넣으면 NaN 반환
+
+theta 2
+어깨 전용 모터값
+해당 하는 방향으로 옮기고, 
+r : 어깨 기준 목표의 수평거리
+z : 어깨 기준 목표의 높이
+l1 : 위팔의 길이
+l2 : 아래팔의 길이
+theta2 = atan2(z, r) + beta
+목표를 똑바로 겨누는 각 + 팔꿈치가 꺾인 만큼의 보정각

@@ -501,7 +501,13 @@ uint8  attempt
 - **파일 역할:** hpp=선언(메뉴), cpp=정의(주방), test=gtest 검수. 한 조각씩.
 - **현재 상태(2026-07-23):** 배관 ✅ **관통 완료 — `colcon test` 초록불(15 tests, 0 failures).** `reach_distance` gtest 2케이스(3-4-5, 0-0) 통과 + `uncrustify`·`lint_cmake`·`xmllint` 전부 통과. C++ 3파일 구조 + CMake + gtest + ROS 2 린트 흐름을 IK 수학과 **분리해 먼저 익힘(전략 성공).**
   - **린트 관통 메모:** `ament_uncrustify --reformat <pkg>`가 cpp/hpp를 제자리 자동수정(단 컨테이너에서 ROS 소싱 후; 호스트엔 미설치). `.cmake` 줄끝 공백은 uncrustify가 안 건드려 수동. 상습 위반은 §0 "린트 선제 검사" 규칙 참조.
-- **다음 행동:** `reach_distance`를 버리고 **실제 IK 조각**을 채우기 시작 — §12.3 수식 순서대로 2R(코사인법칙 → θ3 팔꿈치, θ2 어깨)부터, `acos` 전 `|cos|>1` → `UNREACHABLE` 가드 필수(§12.3 ★).
+- **IK 조각 진척 (2026-07-23, 한 함수씩 hpp+cpp+gtest 3케이스):**
+  - ✅ `base_angle(px, py) = atan2(py, px)` — θ1 겨눔. **항상 해 있음 → plain `double`.** gtest: +x→0 / +y→π/2 / 2사분면(−1,1)→3π/4(atan2 사분면 검증). **파이프라인 1번**(3D→2D 평면 접기, `r` 산출). 사용자가 순서 바로잡음: θ1이 2R보다 먼저.
+  - ✅ `elbow_angle(d, l1, l2)` — θ3 팔꿈치. 코사인법칙 `acos((l1²+l2²−d²)/(2·l1·l2))` + `|cos|>1`→`std::nullopt`(UNREACHABLE). **도달 불가가 있어 `std::optional<double>`**(θ1과 대비). gtest: π/2 / 팔 편 경계 π / 도달불가 nullopt.
+  - ✅ `get_shoulder_angle(r, z, l1, l2)` — θ2 어깨 = `atan2(z,r) + β`(elbow-up 가지), `cos(β)=(l1²+d²−l2²)/(2·l1·d)`. **`get_reach_distance`를 여기서 처음 소비.** optional(같은 도넛 조건). gtest: Diagonal(1,1,1,1)→π/2 / Horizontal(√2,0,1,1)→π/4 / Unreachable(3,0,1,1)→nullopt.
+  - **✅ 2R 완성 (2026-07-23):** 평면 (r,z)만 주면 θ2·θ3가 나온다. gtest 11개 초록불. **전 함수 `get_` 접두사로 통일**(사용자 리네임), **코드는 전체 주석**(사용자 요청 — [[user-writes-code-guide-mode]] 2026-07-23 갱신: 코드=완성본+주석, 환경/실행=사용자가).
+  - ⏭️ **다음:** wrist point + θ4(접근 방향 반영: 피킹=그리퍼 아래) → θ5(롤) → **실제 L1·L2·L3(대각선 오프셋→길이+고정각, 마지막 고비)** → `forward_kinematics` FK 왕복 → 조립 `solve_ik`(결과 struct).
+  - **워크플로 함정(오늘 겪음):** 소스 수정 후 `colcon build` **먼저** — `colcon test`만으론 새 테스트가 안 잡히고, `colcon test-result`는 **캐시된 마지막 결과만** 읽는다(빌드·테스트 안 함). stale 숫자에 속지 말 것.
 - **교훈:** `package.xml`의 `<test_depend>` 철자 오타(`test_depent`)는 스키마에 없는 태그라 `ament_xmllint`가 잡고 의존성도 등록 안 됨 — 여닫는 태그 양쪽 확인. cpp 함수 호출 인자엔 trailing comma 불가(배열 초기화와 비대칭).
 - **빌드 규칙:** 파일 생성=호스트, 빌드=`sim`(`colcon build/test --packages-select arm_kinematics`), **symlink-install 금지**(C++).
 - **남은 IK 조각(종이 수식 → C++ 번역):** 2R(팔꿈치·어깨)+`|cos|>1`→UNREACHABLE / wrist point+θ4 / θ1(atan2)·θ5 / **실제 L1·L2·L3(대각선 오프셋→길이+고정각, 마지막 고비)** / `forward_kinematics`(왕복 테스트용) / 결과 struct + 상태 enum. 이후 gtest FK 왕복 → (별도) KDL 벤치.

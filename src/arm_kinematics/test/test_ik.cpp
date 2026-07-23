@@ -44,3 +44,20 @@ TEST(ElbowAngle, Unreachable)
   auto result = arm_kinematics::get_elbow_angle(3.0, 1.0, 1.0);
   EXPECT_FALSE(result.has_value());
 }
+TEST(ShoulderAngle, Diagonal)
+{
+  auto result = arm_kinematics::get_shoulder_angle(1.0, 1.0, 1.0, 1.0);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_NEAR(result.value(), M_PI / 2, 1e-9);
+}
+TEST(ShoulderAngle, Horizontal)
+{
+  auto result = arm_kinematics::get_shoulder_angle(std::sqrt(2.0), 0.0, 1.0, 1.0);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_NEAR(result.value(), M_PI / 4, 1e-9);
+}
+TEST(ShoulderAngle, Unreachable)
+{
+  auto result = arm_kinematics::get_shoulder_angle(3.0, 0.0, 1.0, 1.0);
+  EXPECT_FALSE(result.has_value());
+}

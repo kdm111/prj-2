@@ -19,4 +19,19 @@ std::optional<double> get_elbow_angle(double d, double l1, double l2)
   }
   return std::acos(cos_theta);
 }
+std::optional<double> get_shoulder_angle(double r, double z, double l1, double l2)
+{
+  double d = get_reach_distance(r, z);   // 어깨에서 목표까지의 직선 거리 D
+  // 보정각 beta의 코사인, 삼각형(l1, d, l2)에서 어깨 꼬깆점의 각도이다.
+  double cos_beta = (l1 * l1 + d * d - l2 * l2) / (2.0 * l1 * d);
+  // 도달 가능성 검사. |cos|이 1을 넘으면 그런 삼각형은 존재하지 않는다.
+  if (std::fabs(cos_beta) > 1.0) {
+    return std::nullopt;
+  }
+  // 어깨에서 목표를 똑바로 겨누는 각. 수평 x축 기준 목표 방향
+  double aim = std::atan2(z, r);
+  // cos_beta로부터 실제 보정각. 팔꿈치가 접혀서 위팔이 더 들려야 하는 양
+  double beta = std::acos(cos_beta);
+  return aim + beta;
+}
 } // namespace arm_kinematics

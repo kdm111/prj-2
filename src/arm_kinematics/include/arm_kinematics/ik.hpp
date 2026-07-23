@@ -6,5 +6,6 @@ namespace arm_kinematics
 {
 double get_reach_distance(double r, double z);   // 함수 선언
 double get_base_angle(double px, double py);   // 물체를 팔에 중심에 위치하도록 베이스 이동
-std::optional<double> get_elbow_angle(double d, double l1, double l2); // 팔꿈치 각도 계산
+std::optional<double> get_elbow_angle(double d, double l1, double l2);   // 팔꿈치 각도 계산
+std::optional<double> get_shoulder_angle(double r, double z, double l1, double l2);   // 어깨 각도 계산
 }
