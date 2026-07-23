@@ -455,7 +455,7 @@ uint8  attempt
 ## 11. 다른 AI를 위한 첫 행동 지침
 
 1. **§0 협업 방식을 지킨다.** 코드를 대신 쓰지 말 것. 단계를 잘게 쪼갤 것. **확인하지 않은 API 동작을 단정하지 말 것.**
-2. **진행 상황: (a) §6.6 fall-through 버그 ✅수리완료(2026-07-22) → (b) mock 상대 `deliver`/재시도/ABORT 3분기 E2E 검증은 ⏸️보류 — 성공 경로만 확인, 재시도·ABORT 두 분기 미검증(부채) → (c) 현재 W2 착수 중.** W2 첫 작업은 §2.4.2대로 **URDF `<axis>` 확인**(해석적 IK 서사의 전제, 확인 전 단정 금지). 이어서 해석적 5-DOF IK 유도·C++·gtest, SceneState(G2), ABORT 확정(G3). **미결 부채:** (b) 분기검증 / G5 CI / sim 영상 재촬영.
+2. **진행 상황: (a) §6.6 fall-through 버그 ✅수리완료(2026-07-22) → (b) mock 상대 `deliver`/재시도/ABORT 3분기 E2E 검증은 ⏸️보류 — 성공 경로만 확인, 재시도·ABORT 두 분기 미검증(부채) → (c) **W2 진행 중 — `arm_kinematics` C++ IK 대부분 구현.** 5모터 기하 각(θ1~θ4)+손목점+FK 완성, gtest 17개+린트 초록(§12.5). **여기서 재개:** FK 왕복 검증 → θ5 → 실제 링크길이 대입 → `solve_ik` 조립 → KDL 벤치. 이어서 SceneState(G2), ABORT 확정(G3). **미결 부채:** (b) 분기검증 / G5 CI / sim 영상 재촬영.
 3. **"OMX"와 "OpenMANIPULATOR-X"를 절대 혼용하지 말 것 (§2.1).**
 4. **계약(§4)의 상수값·필드는 사용자 확인 없이 변경 제안하지 말 것.** 추가는 뒤 번호로만.
 5. **개발 환경 규칙(§3.1)을 어기지 말 것.** 특히 "빌드는 `sim` 컨테이너", "`src/` 파일 생성은 호스트".
@@ -506,8 +506,12 @@ uint8  attempt
   - ✅ `elbow_angle(d, l1, l2)` — θ3 팔꿈치. 코사인법칙 `acos((l1²+l2²−d²)/(2·l1·l2))` + `|cos|>1`→`std::nullopt`(UNREACHABLE). **도달 불가가 있어 `std::optional<double>`**(θ1과 대비). gtest: π/2 / 팔 편 경계 π / 도달불가 nullopt.
   - ✅ `get_shoulder_angle(r, z, l1, l2)` — θ2 어깨 = `atan2(z,r) + β`(elbow-up 가지), `cos(β)=(l1²+d²−l2²)/(2·l1·d)`. **`get_reach_distance`를 여기서 처음 소비.** optional(같은 도넛 조건). gtest: Diagonal(1,1,1,1)→π/2 / Horizontal(√2,0,1,1)→π/4 / Unreachable(3,0,1,1)→nullopt.
   - **✅ 2R 완성 (2026-07-23):** 평면 (r,z)만 주면 θ2·θ3가 나온다. gtest 11개 초록불. **전 함수 `get_` 접두사로 통일**(사용자 리네임), **코드는 전체 주석**(사용자 요청 — [[user-writes-code-guide-mode]] 2026-07-23 갱신: 코드=완성본+주석, 환경/실행=사용자가).
-  - ⏭️ **다음:** wrist point + θ4(접근 방향 반영: 피킹=그리퍼 아래) → θ5(롤) → **실제 L1·L2·L3(대각선 오프셋→길이+고정각, 마지막 고비)** → `forward_kinematics` FK 왕복 → 조립 `solve_ik`(결과 struct).
+  - ✅ `Point2D`(struct {r, z}) + `get_wrist_point(r, z, l3, phi)` — 2R이 실제 도달할 **손목점** = 목표 − L3·(cos φ, sin φ). **첫 struct**(값 2개 반환). 접근각 `phi`(피킹=−π/2 아래). 왜 필요: 2R은 그리퍼 끝이 아니라 손목(모터4)에 닿는다. gtest: DownApproach(1,0,0.5,−π/2)→(1,0.5) / HorizontalApproach(1,1,0.5,0)→(0.5,1). **`phi`(접근각)와 `θ`(관절각) 이름 분리** — 섞이면 헷갈림.
+  - ✅ `get_wrist_angle(phi, θ2, θ3) = φ − θ2 − θ3` — θ4 손목 굽힘. 평행축 3개(θ2·θ3·θ4) 절대방향 합이 접근각 φ가 되게. plain double. gtest: AllAligned→0 / PointDown(−π/2,π/2,0)→−π.
+  - ✅ `get_forward_kinematics(θ2,θ3,θ4, l1,l2,l3)` → `Point2D` 손끝. 링크 절대방향=관절각 누적합, 벡터합. gtest: StraightOut(0…)→(3,0) / StraightUp(π/2…)→(0,3). **IK 왕복 검증용 도구.**
+  - **✅ 현재 (2026-07-23): 5모터 기하 각(θ1~θ4) + 손목점 + FK 전부 구현. gtest 17개 + 린트(uncrustify·lint_cmake·cppcheck·xmllint) 전부 초록.** 단 **placeholder 링크(L1=L2=L3=1)로 기하만 검증** — 실제 로봇 숫자는 아직. `get_` 접두사 통일, 코드 전체 주석.
+  - ⏭️ **다음 (여기서 재개):** ① **FK 왕복 gtest** — 각도→FK→손끝→IK→각도 되돌아오나(진짜 검증, §G6). ② **θ5**(롤, 지금 0 → 인지 붙으면 물체 yaw). ③ **실제 L1·L2·L3**(URDF 대각선 오프셋 → 길이+고정각, **마지막 고비**) → placeholder 치우기 + 각→모터명령 영점보정. ④ 조립 `solve_ik(목표)`→5각+상태 struct. ⑤ (별도) KDL 벤치(성공률·시간).
   - **워크플로 함정(오늘 겪음):** 소스 수정 후 `colcon build` **먼저** — `colcon test`만으론 새 테스트가 안 잡히고, `colcon test-result`는 **캐시된 마지막 결과만** 읽는다(빌드·테스트 안 함). stale 숫자에 속지 말 것.
 - **교훈:** `package.xml`의 `<test_depend>` 철자 오타(`test_depent`)는 스키마에 없는 태그라 `ament_xmllint`가 잡고 의존성도 등록 안 됨 — 여닫는 태그 양쪽 확인. cpp 함수 호출 인자엔 trailing comma 불가(배열 초기화와 비대칭).
 - **빌드 규칙:** 파일 생성=호스트, 빌드=`sim`(`colcon build/test --packages-select arm_kinematics`), **symlink-install 금지**(C++).
-- **남은 IK 조각(종이 수식 → C++ 번역):** 2R(팔꿈치·어깨)+`|cos|>1`→UNREACHABLE / wrist point+θ4 / θ1(atan2)·θ5 / **실제 L1·L2·L3(대각선 오프셋→길이+고정각, 마지막 고비)** / `forward_kinematics`(왕복 테스트용) / 결과 struct + 상태 enum. 이후 gtest FK 왕복 → (별도) KDL 벤치.
+- **남은 IK 조각:** FK 왕복 gtest / θ5(롤) / 실제 L1·L2·L3 대입 / `solve_ik` 조립(결과 struct + 상태) / KDL 벤치. (상세·순서는 위 ⏭️ 다음 참조.)

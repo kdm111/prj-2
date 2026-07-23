@@ -63,7 +63,7 @@ TEST(ShoulderAngle, Unreachable)
 }
 TEST(WristPoint, DownApproach)
 {
-  auto w = arm_kinematics::get_wrist_point(1.0, 0.0, 0.5, -M_PI);
+  auto w = arm_kinematics::get_wrist_point(1.0, 0.0, 0.5, -M_PI / 2);
   EXPECT_NEAR(w.r, 1.0, 1e-9);
   EXPECT_NEAR(w.z, 0.5, 1e-9);
 }
@@ -72,4 +72,26 @@ TEST(WristPoint, HorizontalApproach)
   auto w = arm_kinematics::get_wrist_point(1.0, 1.0, 0.5, 0.0);
   EXPECT_NEAR(w.r, 0.5, 1e-9);
   EXPECT_NEAR(w.z, 1.0, 1e-9);
+}
+TEST(WristAngle, allAligned)
+{
+  EXPECT_NEAR(arm_kinematics::get_wrist_angle(0.0, 0.0, 0.0), 0.0, 1e-9);
+}
+TEST(WristAngle, PointDown)
+{
+  EXPECT_NEAR(arm_kinematics::get_wrist_angle(-M_PI / 2, M_PI / 2, 0.0), -M_PI, 1e-9);
+}
+TEST(ForwardKinematics, StraightOut)
+{
+  // 모든 각 0, 링크, 1:1:1 팔이 수평으로 펴지고 손 끝이 (3.0)에 위치함
+  auto tip = arm_kinematics::get_forward_kinematics(0.0, 0.0, 0.0, 1.0, 1.0, 1.0);
+  EXPECT_NEAR(tip.r, 3.0, 1e-9);
+  EXPECT_NEAR(tip.z, 0.0, 1e-9);
+}
+TEST(ForwardKinematics, StraightUp)
+{
+  // 팔 전체를 수직으로 펴는 행동
+  auto tip = arm_kinematics::get_forward_kinematics(M_PI / 2, 0.0, 0.0, 1.0, 1.0, 1.0);
+  EXPECT_NEAR(tip.r, 0.0, 1e-9);
+  EXPECT_NEAR(tip.z, 3.0, 1e-9);
 }

@@ -42,4 +42,23 @@ Point2D get_wrist_point(double r, double z, double l3, double phi)
   double wrist_z = z - l3 * std::sin(phi);
   return {wrist_r, wrist_z}; // Point2D 반환
 }
+double get_wrist_angle(double phi, double theta2, double theta3)
+{
+  // theta2 + theta3 + theta4 = phi를 theta4에 대해 푼 것
+  return phi - theta2 - theta3;
+}
+Point2D get_forward_kinematics(
+  double theta2, double theta3, double theta4, double l1, double l2,
+  double l3)
+{
+  // 각 링크의 절대 방향 = 관절각 누적합
+  double a2 = theta2;   // 위팔 방향
+  double a3 = theta2 + theta3;   // 아래팔 방향
+  double a4 = theta2 + theta3 + theta4;   // 그리퍼 방향
+
+  // 각 링크 벡터(길이,방향)를 끝에서 끝으로 더해 손끝 좌표를 만든다.
+  double tip_r = l1 * std::cos(a2) + l2 * std::cos(a3) + l3 * std::cos(a4);
+  double tip_z = l1 * std::sin(a2) + l2 * std::sin(a3) + l3 * std::sin(a4);
+  return {tip_r, tip_z};
+}
 } // namespace arm_kinematics
