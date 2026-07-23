@@ -346,3 +346,9 @@ l1 : 위팔의 길이
 l2 : 아래팔의 길이
 theta2 = atan2(z, r) + beta
 목표를 똑바로 겨누는 각 + 팔꿈치가 꺾인 만큼의 보정각
+
+theta 4
+손목 전용 모터값
+해당 위치 위 혹은 가로로 손목이 위치할 수 있도록 하는 식
+wrist_r = r - l3 * cos(phi)
+wrist_z = z - l3 * sin(phi)

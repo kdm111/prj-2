@@ -4,6 +4,12 @@
 // 함수를 arm_kinematics::reach_distance라는 이름표 상자에 넣는다. 즉 다른 라이브러리에 비슷한 이름의 함수가 있어도 부딪히지 않는다.
 namespace arm_kinematics
 {
+struct Point2D
+{
+  double r;
+  double z;
+};
+Point2D get_wrist_point(double r, double z, double l3, double phi);   // 손목점이 실제도 도달 해야 하는 점. 접근 방향에서 그리퍼 크기만큼 물러난 곳 
 double get_reach_distance(double r, double z);   // 함수 선언
 double get_base_angle(double px, double py);   // 물체를 팔에 중심에 위치하도록 베이스 이동
 std::optional<double> get_elbow_angle(double d, double l1, double l2);   // 팔꿈치 각도 계산

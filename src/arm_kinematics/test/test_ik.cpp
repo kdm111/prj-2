@@ -61,3 +61,15 @@ TEST(ShoulderAngle, Unreachable)
   auto result = arm_kinematics::get_shoulder_angle(3.0, 0.0, 1.0, 1.0);
   EXPECT_FALSE(result.has_value());
 }
+TEST(WristPoint, DownApproach)
+{
+  auto w = arm_kinematics::get_wrist_point(1.0, 0.0, 0.5, -M_PI);
+  EXPECT_NEAR(w.r, 1.0, 1e-9);
+  EXPECT_NEAR(w.z, 0.5, 1e-9);
+}
+TEST(WristPoint, HorizontalApproach)
+{
+  auto w = arm_kinematics::get_wrist_point(1.0, 1.0, 0.5, 0.0);
+  EXPECT_NEAR(w.r, 0.5, 1e-9);
+  EXPECT_NEAR(w.z, 1.0, 1e-9);
+}

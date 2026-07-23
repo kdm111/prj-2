@@ -34,4 +34,12 @@ std::optional<double> get_shoulder_angle(double r, double z, double l1, double l
   double beta = std::acos(cos_beta);
   return aim + beta;
 }
+Point2D get_wrist_point(double r, double z, double l3, double phi)
+{
+  // 그리퍼는 손목에서 목표 방향으로 L3 만큼 뻗는다. target = wrist + L3 * (cos(phi), sin(phi))
+  // 뒤집으면 손목 = 목표 - L3 * (cos(phi), sin(phi))
+  double wrist_r = r - l3 * std::cos(phi);
+  double wrist_z = z - l3 * std::sin(phi);
+  return {wrist_r, wrist_z}; // Point2D 반환
+}
 } // namespace arm_kinematics
