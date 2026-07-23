@@ -1,7 +1,7 @@
 # 핸드오프 v4 — 자가 복구 피킹 셀
 
 > AI 어시스턴트 간 컨텍스트 동기화용 문서. 대화가 바뀌거나 다른 도구로 넘어갈 때 이 파일을 먼저 읽힌다.
-> 최종 갱신: 2026-07-22
+> 최종 갱신: 2026-07-23
 > v3 대비 변경: mock 스킬 서버 3종 완성(§6.1), Place.object_id 결정 확정(§6.4), **에이전트 명령 라우팅 + 복구 루프 신설(§6.5) — 여기에 알려진 버그 1건**, 레포/로드맵/첫 행동 갱신(§5·§9·§11)
 
 ---
@@ -13,6 +13,7 @@
 - **경계가 있다 (§8-G1):** 인프라(launch, 컨트롤러 YAML, moveit config)는 벤더 것을 **재사용**한다. 직접 타이핑 대상은 **핵심 로직**(IK, 스킬 서버, 에이전트, 계약)뿐이다.
 - 용어와 개념의 정확성을 중시한다. **틀린 표현은 지적받길 원한다.** AI가 틀렸으면 AI도 정정할 것.
 - **추측하지 말고 확인할 것.** 이 프로젝트에서 AI가 세 번 틀렸다: (1) `ParameterDescriptor(type=...)`가 타입을 정한다고 함 → rclpy는 무시함, (2) 빈 리스트가 예외를 낸다고 함 → 조용히 `BYTE_ARRAY`가 됨, (3) `docker compose restart`로 노드가 재시작된다고 함 → PID 1만 재시작됨. **소스/실물을 열어보고 말할 것.**
+- **린트 선제 검사 (사용자 요청, 2026-07-23).** 사용자는 아직 lint에 익숙하지 않다. **코드를 검토·검사할 때마다** ROS 2 린터(`uncrustify`·`lint_cmake`)에서 걸릴 만한 것을 미리 짚을 것 — 줄끝 공백(cmake 포함), 파일 끝 개행 정확히 1개, 이항 연산자 양옆 공백(`r * r`), namespace·함수 여는 `{`는 다음 줄(Allman). **`ament_uncrustify --reformat`이 최종 판정** — AI 지적은 사전 경고일 뿐. (`copyright`·`cpplint`는 템플릿이 이미 꺼둠.)
 - 매주 일요일 영상 1개. W6가 끝나면 미완성이어도 지원 시작. **협상 불가.**
 
 ---
@@ -488,3 +489,19 @@ uint8  attempt
 ### 12.4 협업 메모
 - 가이드모드로 IK를 0부터 재구축: FK/IK 정의 → IK가 스킬서버 ②번(위치→각도) 자리 → 5모터 물리 역할 → 겨눔/도달/방향/비틀기 분해. **사용자가 전략을 스스로 조립**함(2·3 도달, 4 방향). 수식은 사용자가 종이에, AI는 무대만.
 - 사용자가 처음엔 추상 설명에 막힘 → 몸으로 하는 실험(손끝 고정 후 팔꿈치 움직이기 = 여분 DOF 체감)이 효과적이었음. **한 번에 개념 하나, 물리적 직관 먼저.**
+
+### 12.5 C++ 라이브러리 `arm_kinematics` — 착수 (2026-07-22)
+- 패키지 스캐폴드 커밋 완료(`c0ce0de`, ament_cmake). **배관 4파일 작성 완료(2026-07-23):**
+  - `ik.hpp` — `reach_distance(double,double)` 선언 (커밋 `1fa65be`).
+  - `ik.cpp` — 정의 `return std::sqrt(r*r + z*z);` (`#include "arm_kinematics/ik.hpp"` + `<cmath>`, 같은 namespace).
+  - `test_ik.cpp` — gtest 2케이스(3-4-5→5, 0-0→0), **`EXPECT_NEAR`(오차 1e-9)** 로 부동소수점 비교. `main` 없음(러너 자동).
+  - `CMakeLists.txt` — `add_library(arm_kinematics src/ik.cpp)` + `target_include_directories(... PUBLIC include)`; BUILD_TESTING 안에 `find_package(ament_cmake_gtest REQUIRED)` + `ament_add_gtest(test_ik ...)` + `target_link_libraries(test_ik arm_kinematics)`.
+  - `package.xml` — `<test_depend>ament_cmake_gtest`. (install/export 머신은 미도입 — W3에서 `arm_skills`가 이 lib를 소비할 때 추가.)
+- **사용자 C++ 처음.** 전략: **배관 먼저** — 사소한 함수 하나(`reach_distance(r,z)=√(r²+z²)`=아까의 D)를 헤더→소스→테스트→CMake→`colcon test` 초록불까지 관통. C++ 3파일 역할·CMake 함정을 IK 수학과 **분리**해 학습 후 IK 채움.
+- **파일 역할:** hpp=선언(메뉴), cpp=정의(주방), test=gtest 검수. 한 조각씩.
+- **현재 상태(2026-07-23):** 배관 ✅ **관통 완료 — `colcon test` 초록불(15 tests, 0 failures).** `reach_distance` gtest 2케이스(3-4-5, 0-0) 통과 + `uncrustify`·`lint_cmake`·`xmllint` 전부 통과. C++ 3파일 구조 + CMake + gtest + ROS 2 린트 흐름을 IK 수학과 **분리해 먼저 익힘(전략 성공).**
+  - **린트 관통 메모:** `ament_uncrustify --reformat <pkg>`가 cpp/hpp를 제자리 자동수정(단 컨테이너에서 ROS 소싱 후; 호스트엔 미설치). `.cmake` 줄끝 공백은 uncrustify가 안 건드려 수동. 상습 위반은 §0 "린트 선제 검사" 규칙 참조.
+- **다음 행동:** `reach_distance`를 버리고 **실제 IK 조각**을 채우기 시작 — §12.3 수식 순서대로 2R(코사인법칙 → θ3 팔꿈치, θ2 어깨)부터, `acos` 전 `|cos|>1` → `UNREACHABLE` 가드 필수(§12.3 ★).
+- **교훈:** `package.xml`의 `<test_depend>` 철자 오타(`test_depent`)는 스키마에 없는 태그라 `ament_xmllint`가 잡고 의존성도 등록 안 됨 — 여닫는 태그 양쪽 확인. cpp 함수 호출 인자엔 trailing comma 불가(배열 초기화와 비대칭).
+- **빌드 규칙:** 파일 생성=호스트, 빌드=`sim`(`colcon build/test --packages-select arm_kinematics`), **symlink-install 금지**(C++).
+- **남은 IK 조각(종이 수식 → C++ 번역):** 2R(팔꿈치·어깨)+`|cos|>1`→UNREACHABLE / wrist point+θ4 / θ1(atan2)·θ5 / **실제 L1·L2·L3(대각선 오프셋→길이+고정각, 마지막 고비)** / `forward_kinematics`(왕복 테스트용) / 결과 struct + 상태 enum. 이후 gtest FK 왕복 → (별도) KDL 벤치.

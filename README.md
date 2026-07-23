@@ -303,3 +303,18 @@ cos의 값 범위는 -1 ~ 1사이이다. 이를 초과하면 ErrorCode의 UNREAC
 **모터 5**
 팔이 가리키는 축을 중심으로 그리퍼를 비튼다.
 값은 물체 방향에서 오고 위치 IK에서는 자유 변수가 된다.
+
+### 5일차
+ros2 pkg create arm_kinematics --build-type ament_cmake
+ik.hpp : 해당 패키지에서 사용되는 헤더 파일
+ik.cpp : 역기구학을 계산하는 계산 파일
+test_ik.cpp : 해당 역기구학 테스트 파일
+package.xml : 이 패키지가 무엇을 필요로 하는가의 매니페스트
+CMakeLists.txt : 작업 지시 파일(어떻게 만든다)
+
+
+```shell
+colcon test --packages-select arm_kinematics # 테스트 실행
+colcon test-result --all --verbose # 판정
+```
+
