@@ -314,7 +314,25 @@ CMakeLists.txt : 작업 지시 파일(어떻게 만든다)
 
 
 ```shell
+ament_uncrustify --reformat arm_kinematics
 colcon test --packages-select arm_kinematics # 테스트 실행
 colcon test-result --all --verbose # 판정
 ```
 
+이제 실제 IK 문서로 작성
+
+cos의 해가 없다. 이걸 어떻게 전달하나? ErrorCode.UNRECHABLE 일 경우 arm_kinematics가 arm_interface에 의존하게 된다.
+이 라이브러리는 순수하게 유지해야, ROS 없이 gtest로 테스트가 가능하다.
+따라서 `std:optional<double>` double 하나를 리턴하던가 아무것도 없음. 도달 가능하면 각도를 불가능하면 nullout을 반환한다.
+
+theta 1
+몸통 전용 모터값
+atan2를 사용하는 이유
+점 x,y가 있을 때 원점에서 그 점으로 향하는 화살표가 +x 축에서 몇 도 틀어져 있나
+1,0 -> 0, 0,1 -> 90, -1,0 -> 180, 0,-1 -> -90
+
+theta 3
+팔꿈치 전용 모터값
+cos_theta = (l1^2 + l2^2 - d^2)/(2\*l1\*l2)
+std::fabs cmath의 double  전용 절대값. 소수가 잘리는 함정을 피하기 위함
+if (|cos| > 1) return nullopt : acos에 범위 밖을 넣으면 NaN 반환
