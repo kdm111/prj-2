@@ -86,4 +86,12 @@ IkSolution solve_ik(double x, double y, double z, double phi)
   sol.reachable = true;
   return sol;
 }
+IkSolution to_motor_angles(const IkSolution & geometry)
+{
+  IkSolution motor = geometry;   // reachable, theta1, theta5는 변하지 않는다.
+  motor.theta2 = UPPER_ARM_TILT - geometry.theta2;   // 위팔 기울기 보정
+  motor.theta3 = -UPPER_ARM_TILT - geometry.theta3;   //
+  motor.theta4 = -geometry.theta4;   // 손목 부호는 반전
+  return motor;
+}
 } // namespace arm_kinematics

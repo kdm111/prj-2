@@ -152,3 +152,21 @@ TEST(SolveIk, Unreachable)
   auto sol = arm_kinematics::solve_ik(0.3, 0.0, 0.1, -M_PI / 2);   // 팔 길이 밖
   EXPECT_FALSE(sol.reachable);
 }
+TEST(ToMotorAngles, StraightToMotor)
+{
+  arm_kinematics::IkSolution geometry{};
+  auto motor = arm_kinematics::to_motor_angles(geometry);
+  EXPECT_NEAR(motor.theta2, arm_kinematics::UPPER_ARM_TILT, 1e-9);
+  EXPECT_NEAR(motor.theta3, -arm_kinematics::UPPER_ARM_TILT, 1e-9);
+  EXPECT_NEAR(motor.theta4, 0.0, 1e-9);
+}
+TEST(ToMotorAngles, GeometryZeroPoseToMotorZero)
+{
+  arm_kinematics::IkSolution geometry{};
+  geometry.theta2 = arm_kinematics::UPPER_ARM_TILT;
+  geometry.theta3 = -arm_kinematics::UPPER_ARM_TILT;
+  auto motor = arm_kinematics::to_motor_angles(geometry);
+  EXPECT_NEAR(motor.theta2, 0.0, 1e-9);
+  EXPECT_NEAR(motor.theta3, 0.0, 1e-9);
+  EXPECT_NEAR(motor.theta4, 0.0, 1e-9);
+}

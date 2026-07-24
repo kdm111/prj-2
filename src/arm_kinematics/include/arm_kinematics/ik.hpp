@@ -8,6 +8,13 @@ namespace arm_kinematics
 constexpr double L1 = 0.12052;   // 어깨 -> 팔꿈치 sqrt(0.0415^2 + 0.11315^2)
 constexpr double L2 = 0.162;   // 팔꿈치 -> 손목
 constexpr double L3 = 0.12063;   // 손목 -> TCP 0.0287 + 0.09193
+// 위팔 에는 하드웨어 적으로 고정각이 존재한다.
+// 처음 모델에서는 theta=0이 될 경우 팔이 직선으로 펴져야 하지만 실제로는 그러지 않았다.
+// 그러므로 모델의 0과 모터의 0이 고정각만큼 차이가 나 있고 이 어긋남을 매우는 각을 정의해야 한다.
+// urdf 문서를 참조하면 joint3의 origin은 (0.0415, 0.11315)로 정의되어 있다.
+// joint2와 joint3는 서로 이어져 있다.
+// joint3는 joint2를 기준으로 앞으로 0.0415m, 위로 0.11315m 뻗어있다.
+constexpr double UPPER_ARM_TILT = 1.2192;
 struct Point2D
 {
   double r;
@@ -25,6 +32,8 @@ struct IkSolution
 };
 // IK의 해를 다 알고있음.
 IkSolution solve_ik(double x, double y, double z, double phi);
+// gazebo로 해당 위치로 팔 이동
+IkSolution to_motor_angles(const IkSolution & geometry);
 // 손목점이 실제도 도달 해야 하는 점. 접근 방향에서 그리퍼 크기만큼 물러난 곳
 Point2D get_wrist_point(double r, double z, double l3, double phi);
 // 순기구학 : 관절각 + 링크 길이 > 손끝 위치(평면 r,z) IK 왕복 검증용
