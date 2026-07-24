@@ -96,9 +96,12 @@ TEST(ForwardKinematics, StraightUp)
   EXPECT_NEAR(tip.z, 3.0, 1e-9);
 }
 // 어깨각, 팔꿈치각 손목값을 받아 순서대로 진행하는 테스트 전용 함수
+// 입력 각도를 넣어서 FK 손끝(theta2, theta3, theta4)이 예상 위치에 있는지 확인
+// 손끝위치 (r,z)를 통해 IK 손끝을 가려면 각도가 얼마인가?
+// FK == IK 이면 테스트 통과
 static void expect_round_trip(double theta2, double theta3, double theta4)
 {
-  const double l1 = 1.0, l2 = 1.0, l3 = 0.5;
+  const double l1 = arm_kinematics::L1, l2 = arm_kinematics::L2, l3 = arm_kinematics::L3;
   bool elbow_up = (theta3 >= 0.0);   // theta3 부호로 어느 가지인지 결정
 
   auto tip = arm_kinematics::get_forward_kinematics(theta2, theta3, theta4, l1, l2, l3);
@@ -129,4 +132,23 @@ TEST(RoundTrip, VariousElbowDown)
   expect_round_trip(M_PI / 2, -M_PI / 3, 0.0);
   expect_round_trip(M_PI / 3, -M_PI / 2, 0.0);
   expect_round_trip(M_PI / 4, -M_PI / 3, M_PI / 6);
+}
+TEST(SolveIk, ReachableRoundTrips)
+{
+  // 도달 가능한 목표(평면, y=0) -> solve -> FK로 재구성하면 목표로 돌아오나
+  // 15cm 5cm
+  double tx = 0.15, tz = 0.05, phi = -M_PI / 2;   // 아래 쪽으로 접근
+  auto sol = arm_kinematics::solve_ik(tx, 0.0, tz, phi);
+  ASSERT_TRUE(sol.reachable);
+  auto tip = arm_kinematics::get_forward_kinematics(
+    sol.theta2, sol.theta3, sol.theta4,
+    arm_kinematics::L1, arm_kinematics::L2, arm_kinematics::L3);
+  EXPECT_NEAR(tip.r, tx, 1e-9);
+  EXPECT_NEAR(tip.z, tz, 1e-9);
+}
+TEST(SolveIk, Unreachable)
+{
+  // 가로로 30cm 초과 상황에 도달
+  auto sol = arm_kinematics::solve_ik(0.3, 0.0, 0.1, -M_PI / 2);   // 팔 길이 밖
+  EXPECT_FALSE(sol.reachable);
 }

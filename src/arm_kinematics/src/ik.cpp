@@ -63,4 +63,27 @@ Point2D get_forward_kinematics(
   double tip_z = l1 * std::sin(a2) + l2 * std::sin(a3) + l3 * std::sin(a4);
   return {tip_r, tip_z};
 }
+IkSolution solve_ik(double x, double y, double z, double phi)
+{
+  IkSolution sol{};   // 전부 0/false로 초기화
+
+  sol.theta1 = get_base_angle(x, y);   // theta1 base yaw 값
+  double r = get_reach_distance(x, y);   // 평면 안 수평거리
+
+  Point2D wrist = get_wrist_point(r, z, L3, phi);   // 2R이 닿을 손목점
+  double d = get_reach_distance(wrist.r, wrist.z);   // 손목 점까지의 거리
+
+  auto t3 = get_elbow_angle(d, L1, L2, true);   // elbow_up 해당 위치까지 닿을 팔꿈치 각도
+  auto t2 = get_shoulder_angle(wrist.r, wrist.z, L1, L2);   // 해당 목표 위치까지 어깨 각도
+  if (!t3.has_value() || !t2.has_value()) {
+    sol.reachable = false;   // 범위 바깥 혹은 너무 가까운 위치. 도달 불가능 판정
+    return sol;
+  }
+  sol.theta2 = t2.value();
+  sol.theta3 = t3.value();
+  sol.theta4 = get_wrist_angle(phi, sol.theta2, sol.theta3);
+  sol.theta5 = 0.0;
+  sol.reachable = true;
+  return sol;
+}
 } // namespace arm_kinematics

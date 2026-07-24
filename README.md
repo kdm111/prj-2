@@ -403,3 +403,16 @@ test_ik.gtest : 내가 쓴 테스트
 uncrustify : c++ 포맷 린터 테스트
 xmllint : package.xml 린터 테스트
 
+**링크**
+링크는 곧은 막대가 이다. 각 링크는 굽혀 있지 않다.
+
+joint origin은 다음과 같다.
+urdf 파일 위치 : src/third_party/open_manipulator/open_manipulator_description/urdf/omx_f/
+|관절|origin(부모 기준)|axis|우리 모델|
+|joint2|(0,0,0.0635)|y|어깨 위치|
+|joint3|(0.0415,0, 0.11315)|y|L1|
+|joint4|(0.162, 0, 0)|y|L2|
+|joint5|(0.0287, 0, 0)|x|L3 일부|
+
+**기하 모델에서 산출되는 값이 항상 모터의 값과 항상 일치하지 않는다**
+MoveIt에서도 IK가 남아있지만 일단 직접 계산할 수 있어야 한다.
