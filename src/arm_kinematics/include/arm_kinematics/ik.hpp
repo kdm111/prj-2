@@ -17,7 +17,11 @@ Point2D get_forward_kinematics(
   double l3);
 double get_reach_distance(double r, double z);   // 함수 선언
 double get_base_angle(double px, double py);   // 물체를 팔에 중심에 위치하도록 베이스 이동
-std::optional<double> get_elbow_angle(double d, double l1, double l2);   // 팔꿈치 각도 계산
-std::optional<double> get_shoulder_angle(double r, double z, double l1, double l2);   // 어깨 각도 계산
+// 팔꿈치 각도 계산 bool 대수 포함으로 해당 팔꿈치가 위로 향하게 할지 아래로 향하게 할지 결정한다.
+std::optional<double> get_elbow_angle(double d, double l1, double l2, bool elbow_up = true);
+// 어깨 각도 계산
+std::optional<double> get_shoulder_angle(
+  double r, double z, double l1, double l2,
+  bool elbow_up = true);
 double get_wrist_angle(double phi, double theta2, double theta3);
 }
