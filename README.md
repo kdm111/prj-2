@@ -430,3 +430,28 @@ KDL은 찍어가며 좁혀간다(수치해석/반복법)
 
 KDL의 강점은 범용성이다. 아무 로봇, 아무 자유도에 다 적용가능하다. 내 해석 IK 식은 바로 팔 하나에 특화되어 있다.
 
+**모터에게 어떤 각도로 가라. 이 명령은 어떻게 실행되는가**
+1. 지금 관절이 몇 도 인지 읽는다(엔코더)
+2. 목표까지 어떻게 부드럽게 갈지 계산한다.
+3. 모터에 명령을 쓴다.
+4. 이걸 초당 100번(Hz) 반복한다.
+
+이 과정을 반복하는 것이 바로 컨트롤러이다.
+
+이를 ros2_control로 반복할 것이다.
+controller_manager : 지휘자. 컨트롤러들을 로드/시작/정지한다. 100Hz로 돌린다.
+hardware_interface : 드라이버. read()로 관절값을 읽고, write()로 명령 보냄. sim=gz_ros2_control(Gazebo), 실기=DynamixelHardwareInterface(실모터)
+controllers : 실제 로직.
+
+arm_controller - JointTrajectoryController 팔을 움직이는 놈. 궤적을 받아 100Hz로 보간하여 관절을 몬다.
+joint_state_broaodcaster - 움직이는 게 아니라 관절값을 읽어 /joint_states로 발행만 한다.
+gripper_controller - 그리퍼 담당
+
+궤적을 발행하면 arm_controller가 구독해서 받고 100Hz로 관절까지 부드럽게 몬다.
+
+```
+ros2 control
+```
+컨트롤러를 조회,관리 하는 명령줄 도구이다. `ros2 control list_controllers` 지금 로드된 컨트롤러랑 상태(active/inactive)를 보여준다.
+
+
