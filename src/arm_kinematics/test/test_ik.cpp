@@ -99,14 +99,16 @@ TEST(ForwardKinematics, StraightUp)
 static void expect_round_trip(double theta2, double theta3, double theta4)
 {
   const double l1 = 1.0, l2 = 1.0, l3 = 0.5;
+  bool elbow_up = (theta3 >= 0.0);   // theta3 부호로 어느 가지인지 결정
+
   auto tip = arm_kinematics::get_forward_kinematics(theta2, theta3, theta4, l1, l2, l3);
   double phi = theta2 + theta3 + theta4;
 
   auto wrist = arm_kinematics::get_wrist_point(tip.r, tip.z, l3, phi);
   double d = arm_kinematics::get_reach_distance(wrist.r, wrist.z);
 
-  auto t3 = arm_kinematics::get_elbow_angle(d, l1, l2);
-  auto t2 = arm_kinematics::get_shoulder_angle(wrist.r, wrist.z, l1, l2);
+  auto t3 = arm_kinematics::get_elbow_angle(d, l1, l2, elbow_up);
+  auto t2 = arm_kinematics::get_shoulder_angle(wrist.r, wrist.z, l1, l2, elbow_up);
   ASSERT_TRUE(t3.has_value());
   ASSERT_TRUE(t2.has_value());
   double t4 = arm_kinematics::get_wrist_angle(phi, t2.value(), t3.value());
@@ -121,4 +123,10 @@ TEST(RoundTrip, VariousElbowUp)
   expect_round_trip(M_PI / 6, M_PI / 2, 0.0);
   expect_round_trip(-M_PI / 6, M_PI / 3, M_PI / 6);
   expect_round_trip(M_PI / 4, 2 * M_PI / 3, -M_PI / 4);
+}
+TEST(RoundTrip, VariousElbowDown)
+{
+  expect_round_trip(M_PI / 2, -M_PI / 3, 0.0);
+  expect_round_trip(M_PI / 3, -M_PI / 2, 0.0);
+  expect_round_trip(M_PI / 4, -M_PI / 3, M_PI / 6);
 }
