@@ -387,3 +387,19 @@ acos((l1 * l1 + l2 * l2 - d * d) / (2.0 * l1 * l2));
 
 
 ### 6일차
+
+한 손목점에 팔이 닿는 방법이 둘이다. 손끝을 고정하고 위로 세울 수도 있고 밑으로 세울 수도 잇다.
+
+팔꿈치 위 : theta3 +acos, theta2 aim(motor1) - beta(팔꿈치에 따라 달라지는 각)
+팔꿈치 아래 : tehta3 -acos, theta2 aim + beta
+
+```
+colcon test-result --all --verbose
+```
+Test.xml : ctest 상위 롤업
+cppcheck : static 린터 테스트
+lint_cmake : cmake 린터 테스트
+test_ik.gtest : 내가 쓴 테스트
+uncrustify : c++ 포맷 린터 테스트
+xmllint : package.xml 린터 테스트
+
