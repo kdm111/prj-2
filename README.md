@@ -455,3 +455,15 @@ ros2 control
 컨트롤러를 조회,관리 하는 명령줄 도구이다. `ros2 control list_controllers` 지금 로드된 컨트롤러랑 상태(active/inactive)를 보여준다.
 
 
+**gazebo로 관절 돌리기**
+```
+ros2 topic pub --once /arm_controller/joint_trajectory trajectory_msgs/msg/JointTrajectory "{joint_names: [joint1, joint2, joint3, joint4, joint5], points: [{positions: [0.0, 1.219, -1.219, 0.0, 0.0], time_from_start:{sec: 2}}]}"
+```
+
+고정각 : 링크 모양에 박혀서 모터가 바꾸지 못하는 각. 금속 브래킷 모양이 결정한다.
+
+모터가 0일 때 ㄱ자로 굽는다.
+theta3=0 상태에서 팔이 직선이 아니다. 위 팔에 고정각이 박혀 있다.  
+(1.219(2), -1.219(3), 0(4)) 이 값을 넣으니 팔이 쫙 펴져 수평이 일어난다.
+
+지금 사용하는 로봇은 고정각이 있기 때문에 일부 보정이 필요하다.
